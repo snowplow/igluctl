@@ -1,0 +1,60 @@
+Version 0.6.0 (2019-01-16)
+--------------------------
+Bump SBT to 1.2.8 (snowplow/iglu#467)
+Replace scopt with decline (snowplow/iglu#462)
+Omit "no maxLength" warning if hostname format is present (snowplow/iglu#341)
+Factor out AWScala (snowplow/iglu#283)
+Bump Schema DDL to 0.9.0 (snowplow/iglu#458)
+
+Version 0.5.0 (2018-08-24)
+--------------------------
+Make Redshift maxLength check skippable (snowplow/iglu#408)
+Add static deploy command (snowplow/iglu#375)
+Bump Schema DDL to 0.8.0 (snowplow/iglu#413)
+Bump SBT to 1.2.1 (snowplow/iglu#415)
+
+Version 0.4.1 (2018-04-19)
+--------------------------
+Add support for Java 9 (snowplow/iglu#300)
+Fix interpreting SchemaVer warnings as failures (snowplow/iglu#340)
+Bump to 0.4.1 (snowplow/iglu#345)
+
+Version 0.4.0 (2018-02-07)
+--------------------------
+Fix false failure message in push command (snowplow/iglu#313)
+Switch severity level to skip checks (snowplow/iglu#232)
+Table ownership setup as part of DDL (snowplow/iglu#225)
+Warn user if he tries to generate DDL not for 1-0-0 (snowplow/iglu#221)
+Drop version and extension from executable filename (snowplow/iglu#308)
+Add linter for "description" fields of properties (snowplow/iglu#264)
+Use UTC in header generation of Redshift DDL files (snowplow/iglu#223)
+Bump Schema DDL to 0.7.0 (snowplow/iglu#333)
+
+Version 0.3.0 (2017-12-27)
+--------------------------
+Bump Schema DDL to 0.6.0 (snowplow/iglu#295)
+Switch to Scala 2.12 (snowplow/iglu#287)
+Add lint check of unknown formats (snowplow/iglu#227)
+Bump AWS SDK S3 to 1.11.250 (snowplow/iglu#279)
+Fix incorrect generation of Redshift and JSON Path filenames (snowplow/iglu#271)
+
+Version 0.2.0 (2016-10-05)
+--------------------------
+Escape Windows-separator character (snowplow/iglu#208)
+Add iglu lint severity levels (snowplow/iglu#175)
+Add s3cp subcommand (snowplow/iglu#201)
+Add option to upload schemas publicly (snowplow/iglu#202)
+Add ability to provide full URL as registry root (snowplow/iglu#199)
+Make error messages more explicit (snowplow/iglu#198)
+Fix build with absent Bintray credentials (snowplow/iglu#200)
+Rename schema option to dbschema (snowplow/iglu#197)
+Make output of static generate more consistent (snowplow/iglu#171)
+Make static generate --force more explicit (snowplow/iglu#166)
+
+Version 0.1.0 (2016-08-01)
+--------------------------
+Use exit status 1 for static generate (snowplow/iglu#184)
+Add linting for nonsense schemas (snowplow/iglu#164)
+Add igluctl lint command (snowplow/iglu#145)
+Port Repo Syncer into igluctl static push (snowplow/iglu#144)
+Port schema-guru ddl to igluctl static generate (snowplow/iglu#143)
