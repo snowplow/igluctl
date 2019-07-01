@@ -25,6 +25,7 @@ object Dependencies {
     val jaxbImpl         = "2.3.0"
     val activation       = "1.1.1"
     // Scala
+    val circe            = "0.11.0"
     val catsEffect       = "1.1.0"
     val schemaddl        = "0.9.0"
     val igluClient       = "0.5.0"
@@ -47,6 +48,7 @@ object Dependencies {
     val jaxbImpl         = "com.sun.xml.bind"           %  "jaxb-impl"                 % V.jaxbImpl
     val activation       = "javax.activation"           %  "activation"                % V.activation
     // Scala
+    val circeParser      = "io.circe"                   %% "circe-jawn"                % V.circe
     val catsEffect       = "org.typelevel"              %% "cats-effect"               % V.catsEffect
     val igluClient       = "com.snowplowanalytics"      %% "iglu-scala-client"         % V.igluClient
     val schemaddl        = "com.snowplowanalytics"      %% "schema-ddl"                % V.schemaddl
