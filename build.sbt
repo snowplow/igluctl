@@ -34,6 +34,7 @@ lazy val root = project.in(file("."))
       Libraries.jaxbImpl,
       Libraries.activation,
       // Scala
+      Libraries.circeParser,
       Libraries.catsEffect,
       Libraries.schemaddl,
       Libraries.igluClient,
