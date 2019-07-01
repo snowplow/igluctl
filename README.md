@@ -16,7 +16,7 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 You can download igluctl archive from our Bintray, using following link:
 
 ```
-http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.3.0.zip
+http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.0.zip
 ```
 
 Before running it - make sure you have [Oracle JRE 8][jre] installed.
@@ -38,7 +38,7 @@ Below and everywhere in documentation you'll find example commands without `java
 You can extract and run archive using following commands:
 
 ```bash
-$ unzip -j igluctl_0.3.0.zip
+$ unzip -j igluctl_0.7.0.zip
 $ ./igluctl lint $SCHEMAS_DIR
 ```
 
@@ -47,7 +47,6 @@ $ ./igluctl lint $SCHEMAS_DIR
 ### Generate DDL
 
 You can transform JSON Schema into Redshift (other storages are coming) DDL, using `igluctl static generate` command.
-This functionality was previously implemented as **[Schema Guru][schema-guru]** (pre-0.7.0) `ddl` subcommand
 
 ```bash
 $ ./igluctl static generate $SCHEMAS_DIR
@@ -78,7 +77,7 @@ if you have AWS `default` profile or appropriate environment variables.
 You can check your JSON Schema for vairous common mistakes using `igluctl lint` command.
 
 ```bash
-$ ./igluctl_0.3.0 lint $SCHEMAS_DIR
+$ ./igluctl lint $SCHEMAS_DIR
 ```
 
 This check will include JSON Syntax validation (`required` is not empty, `maximum` is integer etc)
@@ -87,7 +86,7 @@ and also "sanity check", which checks that particular JSON Schema can always val
 
 ## Copyright and License
 
-Igluctl is copyright 2016-2017 Snowplow Analytics Ltd.
+Igluctl is copyright 2016-2020 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0][license]** (the "License");
 you may not use this software except in compliance with the License.
@@ -99,11 +98,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 
-[travis]: https://travis-ci.org/snowplow/iglu
-[travis-image]: https://travis-ci.org/snowplow/iglu.png?branch=master
-
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
 [license]: http://www.apache.org/licenses/LICENSE-2.0
+
+[travis]: https://travis-ci.org/snowplow-incubator/igluctl
+[travis-image]: https://travis-ci.org/snowplow-incubator/igluctl.png?branch=master
 
 [iglu]: https://github.com/snowplow/iglu
 [schema-guru]: https://github.com/snowplow/schema-guru

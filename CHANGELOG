@@ -1,3 +1,20 @@
+Version 0.7.0 (2019-02-06)
+--------------------------
+Add rdbms table-migrate command (#51)
+Make the output argument to static generate optional (#9)
+Change Travis distribution to Trusty (#52)
+Anomalous error on lint (#11)
+Raise error when linting invalid JSON (#10)
+Add --version flag (#12)
+Add rdbms table-check command (#8)
+Add static pull command (#20)
+Bump Iglu Client to 0.6.0 (#49)
+Bump SchemaDDL to 0.10.0 (#50)
+Add server keygen command (#6)
+Add Bintray credentials to .travis.yml (#3)
+Add CI/CD to project (#2)
+Add CHANGELOG (#1)
+
 Version 0.6.0 (2019-01-16)
 --------------------------
 Bump SBT to 1.2.8 (snowplow/iglu#467)
