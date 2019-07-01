@@ -23,9 +23,6 @@ import cats.implicits._
 // decline
 import com.monovore.decline.{ Command => Cmd, _ }
 
-// This library
-import com.snowplowanalytics.iglu.ctl.commands.Push
-
 // Schema DDL
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter
 
@@ -46,9 +43,9 @@ object Command {
     def defaultMetavar: String = "linters"
   }
 
-  implicit val readRegistryRoot: Argument[Push.HttpUrl] = new Argument[Push.HttpUrl] {
-    def read(string: String): ValidatedNel[String, Push.HttpUrl] =
-      Push.HttpUrl.parse(string).leftMap(_.show).toValidatedNel
+  implicit val readRegistryRoot: Argument[Server.HttpUrl] = new Argument[Server.HttpUrl] {
+    def read(string: String): ValidatedNel[String, Server.HttpUrl] =
+      Server.HttpUrl.parse(string).leftMap(_.show).toValidatedNel
     def defaultMetavar: String = "uri"
   }
 
@@ -67,7 +64,7 @@ object Command {
   val force = Opts.flag("force", "Force override existing manually-edited files").orFalse
 
   // static push options
-  val registryRoot = Opts.argument[Push.HttpUrl]("uri")
+  val registryRoot = Opts.argument[Server.HttpUrl]("uri")
   val apikey = Opts.argument[UUID]("uuid")
   val public = Opts.flag("public", "Upload schemas as public").orFalse
 
@@ -93,6 +90,10 @@ object Command {
   val skipWarnings = Opts.flag("skip-warnings", "Don't output messages with log level less than ERROR").orFalse
   val skipChecks = Opts.option[List[Linter]]("skip-checks", s"Lint without specified linters, given comma separated\n$lintersListText").withDefault(List.empty)
 
+  // server keygen options
+  val vendorPrefix = Opts.option[String]("vendor-prefix", "Vendor prefix to associate with generated key")
+    .mapValidated(s => Server.VendorPrefix.fromString(s).toValidatedNel).withDefault(Server.VendorPrefix.Wildcard)
+
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
     (input, output, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
@@ -104,14 +105,20 @@ object Command {
   val staticS3Cp = Opts.subcommand("s3cp", "Upload Schemas or JSON Path files onto S3") {
     (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region).mapN(StaticS3Cp.apply)
   }
+  val serverKeygen = Opts.subcommand("keygen", "Generate API key on remote Iglu Server") {
+    (registryRoot, apikey, vendorPrefix).mapN(ServerKeygen.apply)
+  }
   val static = Opts.subcommand("static", "Work with static registry") {
     staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp)
   }
   val lint = Opts.subcommand("lint", "Validate JSON schemas") {
     (input, skipWarnings, skipChecks).mapN(Lint.apply)
   }
+  val server = Opts.subcommand("server", "Communication with Iglu Server") {
+    serverKeygen
+  }
 
-  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint))
+  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server))
 
 
   sealed trait IgluctlCommand extends Product with Serializable
@@ -129,7 +136,7 @@ object Command {
                             force: Boolean) extends StaticCommand
   case class StaticDeploy(config: Path) extends StaticCommand
   case class StaticPush(input: Path,
-                        registryRoot: Push.HttpUrl,
+                        registryRoot: Server.HttpUrl,
                         apikey: UUID,
                         public: Boolean) extends StaticCommand
   case class StaticS3Cp(input: Path,
@@ -143,6 +150,8 @@ object Command {
   case class Lint(input: Path,
                   skipWarnings: Boolean,
                   skipChecks: List[Linter]) extends IgluctlCommand
+
+  case class ServerKeygen(server: Server.HttpUrl, masterKey: UUID, vendorPrefix: Server.VendorPrefix) extends IgluctlCommand
 
 }
 

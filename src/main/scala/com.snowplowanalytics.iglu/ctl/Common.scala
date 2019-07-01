@@ -22,6 +22,8 @@ import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 
+import io.circe.{ Error => CirceError, ParsingFailure, DecodingFailure }
+
 import fs2.Stream
 
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SchemaVer}
@@ -79,6 +81,14 @@ object Common {
       case Error.ServiceError(line) => line
       case Error.WriteError(path, reason) => s"Cannot write [$path]: $reason"
     }
+
+    def fromServer(error: CirceError): Error =
+      error match {
+        case _: ParsingFailure =>
+          ServiceError("Cannot parse Server response, not JSON. " ++ error.show)
+        case _: DecodingFailure =>
+          ServiceError("Unexpected JSON request from Server. " ++ error.show)
+      }
   }
 
 
@@ -144,4 +154,6 @@ object Common {
         existMissingSchemaVersion(schemaMaps.tail) else true
     }
   }
+
+
 }

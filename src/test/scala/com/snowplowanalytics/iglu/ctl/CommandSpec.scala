@@ -28,8 +28,6 @@ import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter.{ unknownFormats, 
 // specs2
 import org.specs2.Specification
 
-import com.snowplowanalytics.iglu.ctl.commands.Push
-
 // File(".") used everywhere because directory must be available for read
 class CommandSpec extends Specification { def is = s2"""
   Command.parse specification
@@ -49,7 +47,7 @@ class CommandSpec extends Specification { def is = s2"""
   def e2 = {
     val staticPush = Command.parse("static push .. http://54.165.217.26:8081/ 1af851ab-ef1b-4109-a8e2-720ac706334c --public".split(" ").toList)
 
-    val url = Push.HttpUrl.parse("http://54.165.217.26:8081/").getOrElse(throw new RuntimeException("Invalid URI"))
+    val url = Server.HttpUrl.parse("http://54.165.217.26:8081/").getOrElse(throw new RuntimeException("Invalid URI"))
     staticPush must beRight(Command.StaticPush(Paths.get(".."), url, UUID.fromString("1af851ab-ef1b-4109-a8e2-720ac706334c"), true))
   }
 

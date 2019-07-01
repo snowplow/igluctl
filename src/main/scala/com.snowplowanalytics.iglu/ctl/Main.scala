@@ -59,6 +59,9 @@ object Main extends IOApp {
       case Right(Command.StaticS3Cp(input, bucket, s3Path, accessKey, secretKey, profile, region)) =>
         S3cp.process(input, bucket, s3Path, accessKey, secretKey, profile, region)
 
+      case Right(Command.ServerKeygen(server, masterKey, prefix)) =>
+        Keygen.process(server, masterKey, prefix)
+
       case Right(Command.StaticDeploy(config)) =>
         Deploy.process(config)
       case Left(e) =>
