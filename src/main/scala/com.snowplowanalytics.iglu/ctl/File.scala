@@ -92,7 +92,7 @@ sealed trait File[A] extends Serializable { self =>
   }
 
   override def toString: String =
-    s"File($path, ${content.toString.slice(0, 128)})"
+    s"File($path, ${content.toString})"
 
   override def equals(obj: Any): Boolean =
     obj match {

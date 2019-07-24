@@ -16,17 +16,12 @@ package ctl
 // Java
 import java.nio.file.Paths
 
-// cats
-import cats.data.Validated
-import cats.syntax.alternative._
-import cats.syntax.validated._
-import cats.instances.list._
-
 // Iglu core
 import com.snowplowanalytics.iglu.core.SchemaMap
 
 // Schema DDL
 import com.snowplowanalytics.iglu.schemaddl._
+import com.snowplowanalytics.iglu.schemaddl.migrations.Migration
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.MigrationGenerator.generateMigration
 
 // This library
@@ -37,7 +32,7 @@ import File.textFile
  */
 object Migrations {
   /**
-   * Transform whole Valid MigrationMap with different schemas, models and revisions
+   * Transform whole MigrationMap with different schemas, models and revisions
    * to flat list of [[TextFile]]'s with their relative path
    * and stringified DDL as content
    *
@@ -45,17 +40,12 @@ object Migrations {
    * @return flat list of [[TextFile]] ready to be written
    */
   def reifyMigrationMap(
-    migrationMap: ValidMigrationMap,
+    migrationMap: MigrationMap,
     dbSchema: Option[String],
-    varcharSize: Int): List[Validated[String, TextFile]] = {
-
-    val validationFileList = migrationMap.map {
-      case (source, Validated.Valid(migrations)) => createTextFiles(migrations, source, varcharSize, dbSchema).valid[String]
-      case (_,      Validated.Invalid(error))    => error.invalid
-    }.toList
-    val (migrationErrors, migrationFiles) = validationFileList.separate
-    migrationFiles.flatten.map(_.valid[String]) ++ migrationErrors.map(_.invalid[TextFile])
-  }
+    varcharSize: Int): List[TextFile] =
+    migrationMap.toList.flatMap {
+      case (source, migrations) =>  createTextFiles(migrations.toList, source, varcharSize, dbSchema)
+    }
 
   /**
    * Helper function creating list of [[TextFile]] (with same source, varcharSize
