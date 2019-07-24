@@ -17,22 +17,21 @@ import java.nio.file.{Path, Paths}
 import java.time.format.DateTimeFormatter
 import java.time.{ZoneOffset, ZonedDateTime}
 
-import cats.data.{EitherT, NonEmptyList, Validated, EitherNel}
+import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 
 import com.snowplowanalytics.iglu.core.{SchemaMap, SelfDescribingSchema}
-
-import com.snowplowanalytics.iglu.ctl.File.textFile
-import com.snowplowanalytics.iglu.ctl.Utils.{modelGroup, revisionGroup}
-import com.snowplowanalytics.iglu.ctl.Common.Error
-
 import com.snowplowanalytics.iglu.schemaddl._
-import com.snowplowanalytics.iglu.schemaddl.Migration.buildMigrationMap
+import com.snowplowanalytics.iglu.schemaddl.migrations.{Migration,FlatSchema}
 import com.snowplowanalytics.iglu.schemaddl.redshift._
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.{DdlFile, DdlGenerator, JsonPathGenerator}
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.json4s.implicits._
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 
-import org.json4s.JValue
+import com.snowplowanalytics.iglu.ctl.File.textFile
+import com.snowplowanalytics.iglu.ctl.Utils.modelGroup
+import com.snowplowanalytics.iglu.ctl.Common.Error
 
 object Generate {
 
@@ -53,17 +52,25 @@ object Generate {
               force: Boolean,
               owner: Option[String]): Result = {
 
-    val produce: NonEmptyList[SelfDescribingSchema[JValue]] => DdlOutput =
+    val produce: NonEmptyList[IgluSchema] => DdlOutput =
       if (rawMode)
         transformVanilla(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner)
       else
         transformSnowplow(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner)
 
     for {
-      _        <- File.checkOutput(output)
-      schemas  <- EitherT(File.readSchemas(input).map(_.toEither))
-      result    = produce(schemas.map(_.content))
-      messages <- EitherT(outputResult(output, result, force))
+      _           <- File.checkOutput(output)
+      schemaFiles <- EitherT(File.readSchemas(input).map(_.toEither))
+      schemas     <- EitherT(
+        IO.pure[EitherNel[Common.Error, NonEmptyList[IgluSchema]]](
+          schemaFiles.traverse[Option, IgluSchema](
+            s => Schema.parse(s.content.schema)
+              .map(e => SelfDescribingSchema(s.content.self, e))
+          ).toRight(NonEmptyList.one(Common.Error.Message("Error while parsing schema jsons to Schema object")))
+        )
+      )
+      result      = produce(schemas)
+      messages    <- EitherT(outputResult(output, result, force))
     } yield messages
   }
 
@@ -81,7 +88,6 @@ object Generate {
 
   def generateOutput(withJsonPaths: Boolean, rawMode: Boolean)
                     (migrations: List[TextFile],
-                     ddlErrors: List[String],
                      tableDefinitions: List[TableDefinition]): DdlOutput = {
     val ddlWarnings = getDdlWarnings(tableDefinitions)
 
@@ -90,7 +96,7 @@ object Generate {
       .map(ddl => (makeDdlFile(ddl), if (withJsonPaths) Some(makeJsonPaths(rawMode, ddl)) else None))
       .unzip
 
-    DdlOutput(ddls, migrations, jsonPaths.unite, warnings = ddlErrors ++ ddlWarnings)
+    DdlOutput(ddls, migrations, jsonPaths.unite, warnings = ddlWarnings)
   }
 
   /**
@@ -99,57 +105,9 @@ object Generate {
    * @param path base directory for file
    * @param fileName DDL file name
    * @param ddlFile list of statements ready to be rendered
+   * @param orderedSubSchemas subschemas which are ordered wrt to updates, nullness and alphabetic order
    */
-  case class TableDefinition(path: String, fileName: String, ddlFile: DdlFile) {
-    /**
-     * Pick columns listed in `order` (and presented in table definition) and
-     * append them to the end of original create table statemtnt, leaving not
-     * listed in `order` on their places
-     *
-     * @todo this logic should be contained in DDL AST as pair of DdlFile
-     *       and JSONPaths file because they're really tightly coupled
-     *       Redshift output
-     * @param order sublist of column names in right order that should be
-     *              appended to the end of table
-     * @return DDL file object with reordered columns
-     */
-    def reorderTable(order: List[String]): TableDefinition = {
-      val statements = ddlFile.statements.map {
-        case statement: CreateTable => sortColumns(statement, order)
-        case statement => statement
-      }
-      this.copy(ddlFile = ddlFile.copy(statements = statements))
-    }
-
-    private[ctl] def getCreateTable: CreateTable =
-      ddlFile.statements.collect {
-        case statement: CreateTable => statement
-      }
-      .head
-
-    private[ctl] def toSnakeCase: TableDefinition = {
-      val snakifiedColumns = getCreateTable.columns.map { column =>
-        val snakified = StringUtils.snakeCase(column.columnName)
-        column.copy(columnName = snakified)
-      }
-      val statements = ddlFile.statements.map {
-        case statement: CreateTable => statement.copy(columns = snakifiedColumns)
-        case statement => statement
-      }
-      val updatedFile = ddlFile.copy(statements = statements)
-      this.copy(ddlFile = updatedFile)
-    }
-
-    private def sortColumns(createTable: CreateTable, order: List[String]): CreateTable = {
-      val columns = createTable.columns
-      val columnMap = columns.map(c => (c.columnName, c)).toMap
-      val addedOrderedColumns = order.flatMap(columnMap.get)
-      val columnsToSort = order intersect columns.map(_.columnName)
-      val initialColumns = columns.filterNot(c => columnsToSort.contains(c.columnName))
-      val orderedColumns = initialColumns ++ addedOrderedColumns
-      createTable.copy(columns = orderedColumns)
-    }
-  }
+  case class TableDefinition(path: String, fileName: String, ddlFile: DdlFile, orderedSubSchemas: OrderedSubSchemas)
 
   /** Dump warnings to stdout and collect errors and info messages for main method */
   def outputResult(output: Path, result: DdlOutput, force: Boolean): IO[EitherNel[Error, List[String]]] =
@@ -234,11 +192,8 @@ object Generate {
   // Self-describing
 
   /**
-    * Transform list of JSON files to a single [[DdlOutput]] containing
+    * Transform list of self-describing JSON Schemas to a single [[DdlOutput]] containing
     * all data to produce: DDL files, JSONPath files, migrations, etc
-    *
-    * @param files list of valid JSON Files, supposed to be Self-describing JSON Schemas
-    * @return transformation result containing all data to output
     */
   private[ctl] def transformSnowplow(withJsonPaths: Boolean,
                                      dbSchema: String,
@@ -246,44 +201,16 @@ object Generate {
                                      splitProduct: Boolean,
                                      noHeader: Boolean,
                                      owner: Option[String])
-                                    (schemas: NonEmptyList[SelfDescribingSchema[JValue]]): DdlOutput = {
-    // Build table definitions from JSON Schemas
-    val validatedDdls = schemas.toList.map(schema => selfDescSchemaToDdl(schema, dbSchema, splitProduct, owner, varcharSize, noHeader).map(ddl => (schema.self, ddl)))
-    val (errors, ddlPairs) = validatedDdls.separate
-    val ddlMap = groupWithLast(ddlPairs)
+                                    (schemas: NonEmptyList[IgluSchema]): DdlOutput = {
+    val migrationMap = Migration.buildMigrationMap(schemas.toList)
+    val migrations = Migrations.reifyMigrationMap(migrationMap, Some(dbSchema), varcharSize)
 
-    // Build migrations and order-related data
-    val migrationMap = buildMigrationMap(schemas.toList)
-    val validOrderingMap = Migration.getOrdering(migrationMap)
-    val orderingMap = validOrderingMap.collect { case (k, Validated.Valid(v)) => (k, v) }
-    val (_, migrations) = Migrations.reifyMigrationMap(migrationMap, Some(dbSchema), varcharSize).separate
-
-    // Order table-definitions according with migrations
-    val ddlFiles = ddlMap.map { case (description, table) =>
-      val order = orderingMap.getOrElse(revisionGroup(description), Nil)
-      table.reorderTable(order)
+    val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(schemas.toList, migrationMap)
+    val ddlFiles = orderedSubSchemaMap.map {
+      case (schemaMap, subschemas) => produceTable(schemaMap, dbSchema, owner, varcharSize, false, noHeader)(subschemas)
     }.toList
 
-    generateOutput(withJsonPaths, false)(migrations, errors, ddlFiles)
-  }
-
-  /**
-    * Transform valid Self-describing JSON Schema to DDL table definition
-    *
-    * @param schema valid JSON Schema including all Self-describing information
-    * @param dbSchema DB schema name ("atomic")
-    * @return validation of either table definition or error message
-    */
-  private[ctl] def selfDescSchemaToDdl(schema: IgluSchema,
-                                       dbSchema: String,
-                                       splitProduct: Boolean,
-                                       owner: Option[String],
-                                       varcharSize: Int,
-                                       noHeader: Boolean): Validated[String, TableDefinition] = {
-    val ddl = for {
-      flatSchema <- FlatSchema.flattenJsonSchema(schema.schema, splitProduct)
-    } yield produceTable(schema.self, dbSchema, owner, varcharSize, false, noHeader)(flatSchema)
-    ddl.leftMap(fail => s"$fail in [${schema.self.schemaKey.toPath}] Schema")
+    generateOutput(withJsonPaths, false)(migrations, ddlFiles)
   }
 
   // Header Section for a Redshift DDL File
@@ -302,9 +229,6 @@ object Generate {
   /**
     * Transform list of self-describing JSON Schemas
     * to raw DDL output, without extra Snowplow columns
-    *
-    * @param files list of JSON Files (assuming JSON Schemas)
-    * @return transformation result containing all data to output
     */
   private[ctl] def transformVanilla(withJsonPaths: Boolean,
                                     dbSchema: String,
@@ -312,41 +236,19 @@ object Generate {
                                     splitProduct: Boolean,
                                     noHeader: Boolean,
                                     owner: Option[String])
-                                   (files: NonEmptyList[SelfDescribingSchema[JValue]]): DdlOutput = {
-    val (errors, ddlFiles) = files
-      .toList
-      .map(jsonToRawTable(dbSchema, varcharSize, splitProduct, noHeader, owner))
-      .separate
-    generateOutput(withJsonPaths, true)(Nil, errors, ddlFiles)
+                                   (files: NonEmptyList[IgluSchema]): DdlOutput = {
+    val ddlFiles = files.toList
+      .map { schema =>
+        val orderedSubSchemas = FlatSchema.order(FlatSchema.build(schema.schema).subschemas)
+        produceTable(schema.self, dbSchema, owner, varcharSize, true, noHeader)(orderedSubSchemas)
+      }
+    generateOutput(withJsonPaths, true)(Nil, ddlFiles)
   }
-
-  /**
-    * Generate table definition from raw (non-self-describing JSON Schema)
-    *
-    * @param schema self-describing JSON Schema
-    * @return validated table definition object
-    */
-  private def jsonToRawTable(dbSchema: String,
-                             varcharSize: Int,
-                             splitProduct: Boolean,
-                             noHeader: Boolean,
-                             owner: Option[String])
-                            (schema: SelfDescribingSchema[JValue]): Validated[String, TableDefinition] =
-    FlatSchema
-      .flattenJsonSchema(schema.schema, splitProduct)
-      .map(produceTable(schema.self, dbSchema, owner, varcharSize, true, noHeader))
-      .leftMap(fail => fail + s" in [${schema.self.schemaKey.toPath}] file")
-
 
   // Common
 
   /**
     * Produce table from flattened Schema and valid JSON Schema description
-    *
-    * @param flatSchema ordered map of flatten JSON properties
-    * @param schemaMap JSON Schema description
-    * @param dbSchema DB schema name ("atomic")
-    * @return table definition
     */
   private def produceTable(schemaMap: SchemaMap,
                            dbSchema: String,
@@ -354,11 +256,11 @@ object Generate {
                            varcharSize: Int,
                            rawMode: Boolean,
                            noHeader: Boolean)
-                          (flatSchema: FlatSchema): TableDefinition = {
+                          (orderedSubSchemas: OrderedSubSchemas): TableDefinition = {
     val (path, filename) = getFileName(schemaMap)
     val tableName = StringUtils.getTableName(schemaMap)
     val schemaCreate = CreateSchema(dbSchema)
-    val table = DdlGenerator.generateTableDdl(flatSchema, tableName, Some(dbSchema), varcharSize, rawMode)
+    val table = DdlGenerator.generateTableDdl(orderedSubSchemas, tableName, Some(dbSchema), varcharSize, rawMode)
     val commentOn = DdlGenerator.getTableComment(tableName, Some(dbSchema), schemaMap)
     val ddlFile = owner match {
       case Some(ownerStr) =>
@@ -366,7 +268,7 @@ object Generate {
         DdlFile(header(noHeader) ++ List(schemaCreate, Empty, table, Empty, commentOn, Empty, owner))
       case None => DdlFile(header(noHeader) ++ List(schemaCreate, Empty, table, Empty, commentOn))
     }
-    TableDefinition(path, filename, ddlFile)
+    TableDefinition(path, filename, ddlFile, orderedSubSchemas)
   }
 
   /**
@@ -376,8 +278,7 @@ object Generate {
     * @return text file with Redshift table DDL
     */
   private def makeDdlFile(tableDefinition: TableDefinition): File[String] = {
-    val snakified = tableDefinition.toSnakeCase
-    textFile(Paths.get(snakified.path, snakified.fileName + ".sql"), snakified.ddlFile.render(Nil))
+    textFile(Paths.get(tableDefinition.path, tableDefinition.fileName + ".sql"), tableDefinition.ddlFile.render(Nil))
   }
 
   /**
@@ -387,7 +288,7 @@ object Generate {
     * @return text file with JSON Paths if option is set
     */
   private def makeJsonPaths(rawMode: Boolean, ddl: TableDefinition): File[String] = {
-    val content = JsonPathGenerator.getJsonPathsFile(ddl.getCreateTable.columns, rawMode)
+    val content = JsonPathGenerator.getJsonPathsFile(ddl.orderedSubSchemas, rawMode)
     textFile(Paths.get(ddl.path, ddl.fileName + ".json"), content)
   }
 }
