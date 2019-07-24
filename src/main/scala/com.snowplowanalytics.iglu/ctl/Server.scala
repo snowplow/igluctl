@@ -20,6 +20,8 @@ import io.circe.jawn.parse
 import io.circe.syntax._
 import io.circe.generic.semiauto._
 
+import org.json4s.JValue
+
 import scalaj.http.{Http, HttpRequest}
 
 import Common.Error
@@ -31,8 +33,8 @@ import cats.syntax.show._
 import cats.syntax.apply._
 import cats.effect.{ IO, Resource }
 
-import com.snowplowanalytics.iglu.schemaddl.IgluSchema
 import com.snowplowanalytics.iglu.core.json4s.implicits._
+import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 
 /** Common functions and entities for communication with Iglu Server */
 object Server {
@@ -149,7 +151,7 @@ object Server {
     * @param writeKey temporary apikey allowed to write any Schema
     * @return HTTP POST-request ready to be sent
     */
-  def buildRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: IgluSchema, writeKey: String): HttpRequest =
+  def buildRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[JValue], writeKey: String): HttpRequest =
     Http(s"${registryRoot.uri}/api/schemas/${schema.self.schemaKey.toPath}")
       .header("apikey", writeKey)
       .param("isPublic", isPublic.toString)
