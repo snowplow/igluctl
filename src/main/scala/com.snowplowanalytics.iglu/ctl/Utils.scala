@@ -17,9 +17,8 @@ import java.nio.file.Path
 // cats
 import cats.syntax.either._
 
-// Json4s
-import org.json4s.{ JValue, MappingException, Formats }
-import org.json4s.jackson.JsonMethods.compact
+// circe
+import io.circe._
 
 // Iglu
 import com.snowplowanalytics.iglu.core.SchemaMap
@@ -27,7 +26,6 @@ import com.snowplowanalytics.iglu.schemaddl.{ RevisionGroup, ModelGroup }
 
 // This library
 import File.splitPath
-import Common.Error
 
 object Utils {
 
@@ -49,20 +47,10 @@ object Utils {
    * @param schemaMap schema key extracted from it
    * @return true if extracted path is equal to FS path
    */
-  def equalPath(jsonFile: File[JValue], schemaMap: SchemaMap): Boolean = {
+  def equalPath(jsonFile: File[Json], schemaMap: SchemaMap): Boolean = {
     val path = getPath(jsonFile.path.toAbsolutePath)
     SchemaMap.fromPath(path).toOption.contains(schemaMap)
   }
-
-  /** Json4s method for extracting deserialized data */
-  def extractKey[A](json: JValue, key: String)(implicit ev: Manifest[A], formats: Formats): Either[Error, A] =
-    try {
-      Right((json \ key).extract[A])
-    } catch {
-      case _: MappingException =>
-        Error.ConfigParseError(s"Cannot extract key $key from ${compact(json)}").asLeft
-    }
-
 
   /**
    * Extract from Schema description four elements defining REVISION

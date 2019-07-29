@@ -18,8 +18,8 @@ import java.nio.file.Paths
 // cats
 import cats.syntax.either._
 
-// json4s
-import org.json4s.jackson.JsonMethods.parse
+// circe
+import io.circe.literal._
 
 // Iglu
 import com.snowplowanalytics.iglu.core.{ SchemaMap, SchemaVer, SelfDescribingSchema }
@@ -46,90 +46,86 @@ class FileSpec extends Specification { def is = s2"""
 
   // TODO: see https://github.com/snowplow/iglu/issues/165
   def e2 = {
-    val schema = parse(
-      """|{
-         |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-         |	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
-         |	"self": {
-         |		"vendor": "org.ietf",
-         |		"name": "http_cookie",
-         |		"format": "jsonschema",
-         |		"version": "1-0-0"
-         |	},
-         |
-         |	"type": "object",
-         |	"properties": {
-         |		"name": {
-         |			"type": "string",
-         |			"maxLength" : 4096
-         |		},
-         |		"value": {
-         |			"type": ["string", "null"],
-         |			"maxLength" : 4096
-         |		}
-         |	},
-         |	"required": ["name", "value"],
-         |	"additionalProperties": false
-         |}""".stripMargin)
+    val schema = json"""
+         {
+         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
+         	"self": {
+         		"vendor": "org.ietf",
+         		"name": "http_cookie",
+         		"format": "jsonschema",
+         		"version": "1-0-0"
+         	},
+
+         	"type": "object",
+         	"properties": {
+         		"name": {
+         			"type": "string",
+         			"maxLength" : 4096
+         		},
+         		"value": {
+         			"type": ["string", "null"],
+         			"maxLength" : 4096
+         		}
+         	},
+         	"required": ["name", "value"],
+         	"additionalProperties": false
+         }"""
 
     val schemaFile = File.jsonFile(Paths.get("org.ietf/http_cookie/jsonschema/1-0-0"), schema)
 
     // result
     val schemaKey = SchemaMap("org.ietf", "http_cookie", "jsonschema", SchemaVer.Full(1,0,0))
-    val body = parse(
-      """
-        |{
-        |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-        |	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
-        |	"type": "object",
-        |	"properties": {
-        |		"name": {
-        |			"type": "string",
-        |			"maxLength" : 4096
-        |		},
-        |		"value": {
-        |			"type": ["string", "null"],
-        |			"maxLength" : 4096
-        |		}
-        |	},
-        |	"required": ["name", "value"],
-        |	"additionalProperties": false
-        |}
-      """.stripMargin)
-
+    val body = json"""
+        {
+        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
+        	"type": "object",
+        	"properties": {
+        		"name": {
+        			"type": "string",
+        			"maxLength" : 4096
+        		},
+        		"value": {
+        			"type": ["string", "null"],
+        			"maxLength" : 4096
+        		}
+        	},
+        	"required": ["name", "value"],
+        	"additionalProperties": false
+        }"""
 
     schemaFile.asSchema.map(_.content) must beRight(SelfDescribingSchema(schemaKey, body))
   }
 
   def e3 = {
-    val schema = parse(
-      """|{
-         |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-         |	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
-         |	"self": {
-         |		"vendor": "com.acme",
-         |		"name": "example",
-         |		"format": "jsonschema",
-         |		"version": "1-0-0"
-         |	},
-         |	"properties": {
-         |		"name": {}
-         |	}
-         |}""".stripMargin)
+    val schema = json"""
+         {
+         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
+         	"self": {
+         		"vendor": "com.acme",
+         		"name": "example",
+         		"format": "jsonschema",
+         		"version": "1-0-0"
+         	},
+         	"properties": {
+         		"name": {}
+         	}
+         }"""
     val schemaFile = File.jsonFile(Paths.get("/additional/path/com.acme/example/jsonschema/1-0-0"), schema)
 
     // result
     val schemaMap = SchemaMap("com.acme", "example", "jsonschema", SchemaVer.Full(1,0,0))
-    val body = parse(
+    val body = json"""
+        {
+        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
+        	"properties": {
+        		"name": {}
+        	}
+        }
       """
-        |{
-        |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-        |	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
-        |	"properties": {
-        |		"name": {}
-        |	}
-        |}
-      """.stripMargin)
 
     val contentExpectation = schemaFile.asSchema.map(_.content) must beRight(SelfDescribingSchema(schemaMap, body))
     val pathExpectation = schemaFile.asSchema.map(_.path) must beRight(Paths.get("/additional/path/com.acme/example/jsonschema/1-0-0"))
@@ -137,20 +133,20 @@ class FileSpec extends Specification { def is = s2"""
   }
 
   def e4 = {
-    val schema = parse(
-      """|{
-         |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-         |	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
-         |	"self": {
-         |		"vendor": "com.acme",
-         |		"name": "example",
-         |		"format": "jsonschema",
-         |		"version": "1-0-0"
-         |	},
-         |	"properties": {
-         |		"name": {}
-         |	}
-         |}""".stripMargin)
+    val schema = json"""
+         {
+         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
+         	"self": {
+         		"vendor": "com.acme",
+         		"name": "example",
+         		"format": "jsonschema",
+         		"version": "1-0-0"
+         	},
+         	"properties": {
+         		"name": {}
+         	}
+         }"""
     val schemaFile = File.jsonFile(Paths.get("/com.failure/example/jsonschema/1-0-0"), schema)
     val expected = Error.PathMismatch(Paths.get("/com.failure/example/jsonschema/1-0-0"),SchemaMap("com.acme","example","jsonschema",SchemaVer.Full(1,0,0)))
 
