@@ -48,10 +48,9 @@ object Pull {
     */
   def process(outputDir: Path,
               registryRoot: Server.HttpUrl,
-              masterApiKey: UUID): IgluctlResult = {
+              readApiKey: Option[UUID]): IgluctlResult = {
     val stream = for {
-      keys <- Stream.resource(Server.temporaryKeys(registryRoot, masterApiKey))
-      schemas <- Stream.eval(getSchemas(Server.buildPullRequest(registryRoot, keys.read)))
+      schemas <- Stream.eval(getSchemas(Server.buildPullRequest(registryRoot, readApiKey)))
       schema <- Stream.emits[Failing, SelfDescribingSchema[Json]](schemas)
       writeRes <- Stream.eval(writeSchema(schema, outputDir))
     } yield writeRes
