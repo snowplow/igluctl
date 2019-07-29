@@ -15,15 +15,17 @@ package commands
 
 import java.nio.file.Path
 
-import cats.data.{EitherT, NonEmptyList, Ior, IorNel, EitherNel}
 import cats.implicits._
+import cats.data.{EitherT, NonEmptyList, Ior, IorNel, EitherNel}
+import cats.data.Validated.{Valid, Invalid}
 
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.json4s.implicits._
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.SanityLinter.{ lint, Report => LinterReport }
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.{Linter, Schema, SelfSyntaxChecker}
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.{Linter, Schema}
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
+import com.snowplowanalytics.iglu.client.validator.CirceValidator
 
-import org.json4s.JsonAST.JValue
+import io.circe._
 
 import com.snowplowanalytics.iglu.ctl.Common.Error
 
@@ -87,8 +89,12 @@ object Lint {
     * @param schema a JSON schema with validated correct underlying FS path
     * @return [[Report]] ADT, indicating successful lint or containing errors
     */
-  def check(linters: List[Linter], skipWarnings: Boolean)(schema: SelfDescribingSchema[JValue]): Either[SchemaFailure, String] = {
-    val syntaxCheck = SelfSyntaxChecker.validateSchema(schema.schema, skipWarnings).leftMap(_.map(_.message))
+  def check(linters: List[Linter], skipWarnings: Boolean)(schema: SelfDescribingSchema[Json]): Either[SchemaFailure, String] = {
+    val syntaxCheck = CirceValidator.checkSchema(schema.schema).map(e => s"Could not validate the schema, path: ${e.path}, message: ${e.message}") match {
+      case Nil => Valid[Unit](())
+      case e => Invalid(NonEmptyList.fromListUnsafe(e))
+    }
+
     val lintCheck = Schema.parse(schema.schema).map { schema =>
       lint(schema, linters) match {
         case report if report.isEmpty => ().validNel[String]

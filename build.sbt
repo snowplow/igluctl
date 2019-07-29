@@ -44,6 +44,7 @@ lazy val root = project.in(file("."))
       Libraries.fs2Io,
       // Scala (test only)
       Libraries.specs2,
-      Libraries.scalaCheck
+      Libraries.scalaCheck,
+      Libraries.circeLiteral
     )
   )
