@@ -16,7 +16,7 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.IO
 
 import fs2.Stream
-import org.json4s.JValue
+import io.circe.Json
 
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 
@@ -38,7 +38,7 @@ package object ctl {
   type TextFile = File[String]
 
   /** JSON content and reference on filesystem */
-  type JsonFile = File[JValue]
+  type JsonFile = File[Json]
 
-  type SchemaFile = File[SelfDescribingSchema[JValue]]
+  type SchemaFile = File[SelfDescribingSchema[Json]]
 }

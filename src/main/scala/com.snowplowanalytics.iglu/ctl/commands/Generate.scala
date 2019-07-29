@@ -26,8 +26,8 @@ import com.snowplowanalytics.iglu.schemaddl._
 import com.snowplowanalytics.iglu.schemaddl.migrations.{Migration,FlatSchema}
 import com.snowplowanalytics.iglu.schemaddl.redshift._
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.{DdlFile, DdlGenerator, JsonPathGenerator}
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.json4s.implicits._
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 
 import com.snowplowanalytics.iglu.ctl.File.textFile
 import com.snowplowanalytics.iglu.ctl.Utils.modelGroup
