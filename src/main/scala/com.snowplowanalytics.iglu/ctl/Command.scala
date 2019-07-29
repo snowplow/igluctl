@@ -16,6 +16,8 @@ package com.snowplowanalytics.iglu.ctl
 import java.util.UUID
 import java.nio.file.Path
 
+import com.snowplowanalytics.iglu.core.SchemaKey
+
 // cats
 import cats.data.{ ValidatedNel, Validated }
 import cats.implicits._
@@ -47,6 +49,12 @@ object Command {
     def read(string: String): ValidatedNel[String, Server.HttpUrl] =
       Server.HttpUrl.parse(string).leftMap(_.show).toValidatedNel
     def defaultMetavar: String = "uri"
+  }
+
+  implicit val readSchemaKey: Argument[SchemaKey] = new Argument[SchemaKey] {
+    override def read(string: String): ValidatedNel[String, SchemaKey] =
+      SchemaKey.fromUri(string).leftMap(_.code).toValidatedNel
+    override def defaultMetavar: String = "schemaKey"
   }
 
   // common options
@@ -94,6 +102,24 @@ object Command {
   val vendorPrefix = Opts.option[String]("vendor-prefix", "Vendor prefix to associate with generated key")
     .mapValidated(s => Server.VendorPrefix.fromString(s).toValidatedNel).withDefault(Server.VendorPrefix.Wildcard)
 
+  // database options
+  val dbPort = Opts.option[Int]("port", "Database port").withDefault(5439)
+  val dbHost = Opts.option[String]("host", "Database host address").orNone
+  val dbName = Opts.option[String]("dbname", "Database name").orNone
+  val dbUserName = Opts.option[String]("username", "Database username").orNone
+  val dbPassword = Opts.option[String]("password", "Database password").orNone
+  val dbConfig = (dbHost, dbPort, dbName, dbUserName, dbPassword).mapN(DbConfig.apply)
+
+  // TableCheck options
+  val igluResolver = Opts.option[Path]("resolver", "Iglu resolver config path")
+  val selfDescribingSchema = Opts.option[SchemaKey]("schema", "Schema to check against. It should have iglu:<URI> format")
+  val igluServerUrl = Opts.option[Server.HttpUrl]("server", "Iglu Server URL")
+  val igluServerApiKey = Opts.option[UUID]("apikey", "Iglu Server Read ApiKey (non master)").orNone
+  val dbSchema = Opts.option[String]("dbschema", "Database schema").withDefault("atomic")
+
+  val singleTableCheck = (igluResolver, selfDescribingSchema).mapN(SingleTableCheck.apply)
+  val multipleTableCheck = (igluServerUrl, igluServerApiKey).mapN(MultipleTableCheck.apply)
+
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
     (input, output, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
@@ -103,7 +129,7 @@ object Command {
     (input, registryRoot, apikey, public).mapN(StaticPush.apply)
   }
   val staticPull = Opts.subcommand("pull", "Download schemas from Iglu Server to local folder") {
-    (output, registryRoot, apikey).mapN(StaticPull.apply)
+    (output, registryRoot, apikey.orNone).mapN(StaticPull.apply)
   }
   val staticS3Cp = Opts.subcommand("s3cp", "Upload Schemas or JSON Path files onto S3") {
     (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region).mapN(StaticS3Cp.apply)
@@ -120,8 +146,13 @@ object Command {
   val server = Opts.subcommand("server", "Communication with Iglu Server") {
     serverKeygen
   }
+  val tableCheck = Opts.subcommand("table-check", "Check given schema's table structure against schema") {
+    (singleTableCheck.orElse(multipleTableCheck), dbSchema, dbConfig).mapN(TableCheck.apply)
+  }
 
-  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server))
+  val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck)
+
+  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(rdbms))
 
 
   sealed trait IgluctlCommand extends Product with Serializable
@@ -144,7 +175,7 @@ object Command {
                         public: Boolean) extends StaticCommand
   case class StaticPull(output: Path,
                         registryRoot: Server.HttpUrl,
-                        apikey: UUID) extends StaticCommand
+                        apikey: Option[UUID]) extends StaticCommand
   case class StaticS3Cp(input: Path,
                         bucket: Bucket,
                         s3Path: Option[S3Path],
@@ -158,6 +189,24 @@ object Command {
                   skipChecks: List[Linter]) extends IgluctlCommand
 
   case class ServerKeygen(server: Server.HttpUrl, masterKey: UUID, vendorPrefix: Server.VendorPrefix) extends IgluctlCommand
+
+  case class DbConfig(host: Option[String],
+                      port: Int,
+                      dbname: Option[String],
+                      username: Option[String],
+                      password: Option[String])
+
+  sealed trait TableCheckType extends Product with Serializable
+
+  case class SingleTableCheck(resolver: Path,
+                              schema: SchemaKey) extends TableCheckType
+
+  case class MultipleTableCheck(igluServerUrl: Server.HttpUrl,
+                                apiKey: Option[UUID]) extends TableCheckType
+
+  case class TableCheck(tableCheckType: TableCheckType,
+                        dbSchema: String,
+                        storageConfig: DbConfig) extends IgluctlCommand
 
 }
 
