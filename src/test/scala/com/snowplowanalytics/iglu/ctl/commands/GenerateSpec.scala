@@ -16,16 +16,12 @@ package commands
 import java.nio.file.Paths
 
 import cats.data.NonEmptyList
-import cats.syntax.either._
 
-import com.snowplowanalytics.iglu.core.json4s.implicits._
+import io.circe.literal._
+
 import com.snowplowanalytics.iglu.core.{SchemaMap, SchemaVer, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.ctl.File.textFile
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.json4s.implicits._
-
-import org.json4s.JsonAST.JValue
-import org.json4s.jackson.JsonMethods.parse
+import com.snowplowanalytics.iglu.ctl.SpecHelpers._
 
 import org.specs2.Specification
 
@@ -41,99 +37,102 @@ class GenerateSpec extends Specification { def is = s2"""
     correctly setup table ownership $e8
     correctly create migrations from 1-0-0 to 1-0-1 $e9
     correctly create migrations from 1-0-0 to 1-0-2 $e10
+    correctly create ddl for schema with enum $e11
+    correctly create ddl for schema with nested enum $e12
+    correctly create ddl for schema with field without type $e13
+    correctly create ddl for empty schema $e14
   """
 
 
   def e1 = {
-    val inputSchema = parse(
-      """
-        |{
-        |	"$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-        |	"description":"Schema for an AWS Lambda Java context object, http://docs.aws.amazon.com/lambda/latest/dg/java-context-object.html",
-        |	"self":{
-        |		"vendor":"com.amazon.aws.lambda",
-        |		"name":"java_context",
-        |		"version":"1-0-0",
-        |		"format":"jsonschema"
-        |	},
-        |	"type":"object",
-        |	"properties":{
-        |		"functionName":{
-        |			"type":"string"
-        |		},
-        |		"logStreamName":{
-        |			"type":"string"
-        |		},
-        |		"awsRequestId":{
-        |			"type":"string"
-        |		},
-        |		"remainingTimeMillis":{
-        |			"type":"integer",
-        |			"minimum":0
-        |		},
-        |		"logGroupName":{
-        |			"type":"string"
-        |		},
-        |		"memoryLimitInMB":{
-        |			"type":"integer",
-        |			"minimum":0
-        |		},
-        |		"clientContext":{
-        |			"type":"object",
-        |			"properties":{
-        |				"client":{
-        |					"type":"object",
-        |					"properties":{
-        |						"appTitle":{
-        |							"type":"string"
-        |						},
-        |						"appVersionName":{
-        |							"type":"string"
-        |						},
-        |						"appVersionCode":{
-        |							"type":"string"
-        |						},
-        |						"appPackageName":{
-        |							"type":"string"
-        |						}
-        |					},
-        |					"additionalProperties":false
-        |				},
-        |				"custom":{
-        |					"type":"object",
-        |					"patternProperties":{
-        |						".*":{
-        |							"type":"string"
-        |						}
-        |					}
-        |				},
-        |				"environment":{
-        |					"type":"object",
-        |					"patternProperties":{
-        |						".*":{
-        |							"type":"string"
-        |						}
-        |					}
-        |				}
-        |			},
-        |			"additionalProperties":false
-        |		},
-        |		"identity":{
-        |			"type":"object",
-        |			"properties":{
-        |				"identityId":{
-        |					"type":"string"
-        |				},
-        |				"identityPoolId":{
-        |					"type":"string"
-        |				}
-        |			},
-        |			"additionalProperties":false
-        |		}
-        |	},
-        |	"additionalProperties":false
-        |}
-      """.stripMargin)
+    val input = json"""
+        {
+        	"$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        	"description":"Schema for an AWS Lambda Java context object, http://docs.aws.amazon.com/lambda/latest/dg/java-context-object.html",
+        	"self":{
+        		"vendor":"com.amazon.aws.lambda",
+        		"name":"java_context",
+        		"version":"1-0-0",
+        		"format":"jsonschema"
+        	},
+        	"type":"object",
+        	"properties":{
+        		"functionName":{
+        			"type":"string"
+        		},
+        		"logStreamName":{
+        			"type":"string"
+        		},
+        		"awsRequestId":{
+        			"type":"string"
+        		},
+        		"remainingTimeMillis":{
+        			"type":"integer",
+        			"minimum":0
+        		},
+        		"logGroupName":{
+        			"type":"string"
+        		},
+        		"memoryLimitInMB":{
+        			"type":"integer",
+        			"minimum":0
+        		},
+        		"clientContext":{
+        			"type":"object",
+        			"properties":{
+        				"client":{
+        					"type":"object",
+        					"properties":{
+        						"appTitle":{
+        							"type":"string"
+        						},
+        						"appVersionName":{
+        							"type":"string"
+        						},
+        						"appVersionCode":{
+        							"type":"string"
+        						},
+        						"appPackageName":{
+        							"type":"string"
+        						}
+        					},
+        					"additionalProperties":false
+        				},
+        				"custom":{
+        					"type":"object",
+        					"patternProperties":{
+        						".*":{
+        							"type":"string"
+        						}
+        					}
+        				},
+        				"environment":{
+        					"type":"object",
+        					"patternProperties":{
+        						".*":{
+        							"type":"string"
+        						}
+        					}
+        				}
+        			},
+        			"additionalProperties":false
+        		},
+        		"identity":{
+        			"type":"object",
+        			"properties":{
+        				"identityId":{
+        					"type":"string"
+        				},
+        				"identityPoolId":{
+        					"type":"string"
+        				}
+        			},
+        			"additionalProperties":false
+        		}
+        	},
+        	"additionalProperties":false
+        }
+      """.schema
 
     val expectedDdl =
       """|CREATE SCHEMA IF NOT EXISTS atomic;
@@ -170,7 +169,6 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_1 IS 'iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0';""".stripMargin
 
-    val input = createSelfDescribingSchema(inputSchema)
     val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(input))
     val expected = Generate.DdlOutput(List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), expectedDdl)), Nil, Nil, Nil)
 
@@ -200,96 +198,94 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_1 IS 'iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0';""".stripMargin
 
-    val sourceSchema = parse(
-      """
-        |{
-        |	"description":"Schema for an AWS Lambda Java context object, http://docs.aws.amazon.com/lambda/latest/dg/java-context-object.html",
-        |	"self":{
-        |		"vendor":"com.amazon.aws.lambda",
-        |		"name":"java_context",
-        |		"format":"jsonschema",
-        |		"version":"1-0-0"
-        | },
-        |	"type":"object",
-        |	"properties":{
-        |		"functionName":{
-        |			"type":"string"
-        |		},
-        |		"logStreamName":{
-        |			"type":"string"
-        |		},
-        |		"awsRequestId":{
-        |			"type":"string"
-        |		},
-        |		"remainingTimeMillis":{
-        |			"type":"integer",
-        |			"minimum":0
-        |		},
-        |		"logGroupName":{
-        |			"type":"string"
-        |		},
-        |		"memoryLimitInMB":{
-        |			"type":"integer",
-        |			"minimum":0
-        |		},
-        |		"clientContext":{
-        |			"type":"object",
-        |			"properties":{
-        |				"client":{
-        |					"type":"object",
-        |					"properties":{
-        |						"appTitle":{
-        |							"type":"string"
-        |						},
-        |						"appVersionName":{
-        |							"type":"string"
-        |						},
-        |						"appVersionCode":{
-        |							"type":"string"
-        |						},
-        |						"appPackageName":{
-        |							"type":"string"
-        |						}
-        |					},
-        |					"additionalProperties":false
-        |				},
-        |				"custom":{
-        |					"type":"object",
-        |					"patternProperties":{
-        |						".*":{
-        |							"type":"string"
-        |						}
-        |					}
-        |				},
-        |				"environment":{
-        |					"type":"object",
-        |					"patternProperties":{
-        |						".*":{
-        |							"type":"string"
-        |						}
-        |					}
-        |				}
-        |			},
-        |			"additionalProperties":false
-        |		},
-        |		"identity":{
-        |			"type":"object",
-        |			"properties":{
-        |				"identityId":{
-        |					"type":"string"
-        |				},
-        |				"identityPoolId":{
-        |					"type":"string"
-        |				}
-        |			},
-        |			"additionalProperties":false
-        |		}
-        |	},
-        |	"additionalProperties":false
-        |}
-      """.stripMargin)
+    val input = json"""
+        {
+        	"description":"Schema for an AWS Lambda Java context object, http://docs.aws.amazon.com/lambda/latest/dg/java-context-object.html",
+        	"self":{
+        		"vendor":"com.amazon.aws.lambda",
+        		"name":"java_context",
+        		"format":"jsonschema",
+        		"version":"1-0-0"
+         },
+        	"type":"object",
+        	"properties":{
+        		"functionName":{
+        			"type":"string"
+        		},
+        		"logStreamName":{
+        			"type":"string"
+        		},
+        		"awsRequestId":{
+        			"type":"string"
+        		},
+        		"remainingTimeMillis":{
+        			"type":"integer",
+        			"minimum":0
+        		},
+        		"logGroupName":{
+        			"type":"string"
+        		},
+        		"memoryLimitInMB":{
+        			"type":"integer",
+        			"minimum":0
+        		},
+        		"clientContext":{
+        			"type":"object",
+        			"properties":{
+        				"client":{
+        					"type":"object",
+        					"properties":{
+        						"appTitle":{
+        							"type":"string"
+        						},
+        						"appVersionName":{
+        							"type":"string"
+        						},
+        						"appVersionCode":{
+        							"type":"string"
+        						},
+        						"appPackageName":{
+        							"type":"string"
+        						}
+        					},
+        					"additionalProperties":false
+        				},
+        				"custom":{
+        					"type":"object",
+        					"patternProperties":{
+        						".*":{
+        							"type":"string"
+        						}
+        					}
+        				},
+        				"environment":{
+        					"type":"object",
+        					"patternProperties":{
+        						".*":{
+        							"type":"string"
+        						}
+        					}
+        				}
+        			},
+        			"additionalProperties":false
+        		},
+        		"identity":{
+        			"type":"object",
+        			"properties":{
+        				"identityId":{
+        					"type":"string"
+        				},
+        				"identityPoolId":{
+        					"type":"string"
+        				}
+        			},
+        			"additionalProperties":false
+        		}
+        	},
+        	"additionalProperties":false
+        }
+      """.schema
 
-    val input = createSelfDescribingSchema(sourceSchema)
     val output = Generate.transformVanilla(false, "atomic", 128, false, true, None)(NonEmptyList.of(input))
     val expected = Generate.DdlOutput(List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), resultContent)), Nil, Nil, Nil)
 
@@ -332,83 +328,81 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |COMMENT ON TABLE snowplow.com_amazon_aws_ec2_instance_identity_document_1 IS 'iglu:com.amazon.aws.ec2/instance_identity_document/jsonschema/1-0-0';""".stripMargin
 
-    val sourceSchema = parse(
-      """|{
-         |  "$schema" : "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-         |  "self" : {
-         |    "vendor" : "com.amazon.aws.ec2",
-         |    "name" : "instance_identity_document",
-         |    "version" : "1-0-0",
-         |    "format" : "jsonschema"
-         |  },
-         |  "type" : "object",
-         |  "properties" : {
-         |    "instanceId" : {
-         |      "type" : "string",
-         |      "minLength" : 10,
-         |      "maxLength" : 19
-         |    },
-         |    "devpayProductCodes" : {
-         |      "type" : [ "array", "null" ],
-         |      "items" : {
-         |        "type" : "string"
-         |      }
-         |    },
-         |    "billingProducts" : {
-         |      "type" : [ "array", "null" ],
-         |      "items" : {
-         |        "type" : "string"
-         |      }
-         |    },
-         |    "availabilityZone" : {
-         |      "type" : "string"
-         |    },
-         |    "accountId" : {
-         |      "type" : "string"
-         |    },
-         |    "ramdiskId" : {
-         |      "type" : [ "string", "null" ],
-         |      "minLength" : 12,
-         |      "maxLength" : 12
-         |    },
-         |    "architecture" : {
-         |      "type" : "string"
-         |    },
-         |    "instanceType" : {
-         |      "type" : "string"
-         |    },
-         |    "version" : {
-         |      "type" : "string"
-         |    },
-         |    "pendingTime" : {
-         |      "type" : "string",
-         |      "format" : "date-time"
-         |    },
-         |    "imageId" : {
-         |      "type" : "string",
-         |      "minLength" : 12,
-         |      "maxLength" : 12
-         |    },
-         |    "privateIp" : {
-         |      "type" : "string",
-         |      "format" : "ipv4",
-         |      "minLength" : 11,
-         |      "maxLength" : 15
-         |    },
-         |    "region" : {
-         |      "type" : "string"
-         |    },
-         |    "kernelId" : {
-         |      "type" : [ "string", "null" ],
-         |      "minLength" : 12,
-         |      "maxLength" : 12
-         |    }
-         |  },
-         |  "additionalProperties" : false
-         |}""".stripMargin)
+    val input = json"""
+         {
+           "$$schema" : "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+           "self" : {
+             "vendor" : "com.amazon.aws.ec2",
+             "name" : "instance_identity_document",
+             "version" : "1-0-0",
+             "format" : "jsonschema"
+           },
+           "type" : "object",
+           "properties" : {
+             "instanceId" : {
+               "type" : "string",
+               "minLength" : 10,
+               "maxLength" : 19
+             },
+             "devpayProductCodes" : {
+               "type" : [ "array", "null" ],
+               "items" : {
+                 "type" : "string"
+               }
+             },
+             "billingProducts" : {
+               "type" : [ "array", "null" ],
+               "items" : {
+                 "type" : "string"
+               }
+             },
+             "availabilityZone" : {
+               "type" : "string"
+             },
+             "accountId" : {
+               "type" : "string"
+             },
+             "ramdiskId" : {
+               "type" : [ "string", "null" ],
+               "minLength" : 12,
+               "maxLength" : 12
+             },
+             "architecture" : {
+               "type" : "string"
+             },
+             "instanceType" : {
+               "type" : "string"
+             },
+             "version" : {
+               "type" : "string"
+             },
+             "pendingTime" : {
+               "type" : "string",
+               "format" : "date-time"
+             },
+             "imageId" : {
+               "type" : "string",
+               "minLength" : 12,
+               "maxLength" : 12
+             },
+             "privateIp" : {
+               "type" : "string",
+               "format" : "ipv4",
+               "minLength" : 11,
+               "maxLength" : 15
+             },
+             "region" : {
+               "type" : "string"
+             },
+             "kernelId" : {
+               "type" : [ "string", "null" ],
+               "minLength" : 12,
+               "maxLength" : 12
+             }
+           },
+           "additionalProperties" : false
+         }""".schema
 
-
-    val input = createSelfDescribingSchema(sourceSchema)
     val output = Generate.transformSnowplow(false, "snowplow", 4096, false, true, None)(NonEmptyList.of(input))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.amazon.aws.ec2/instance_identity_document_1.sql"), resultContent)),
@@ -419,108 +413,107 @@ class GenerateSpec extends Specification { def is = s2"""
   }
 
   def e4 = {
-    val sourceSchema = parse(
-      """|{
-         |	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-         |	"description": "Schema for a AWS CloudFront web distribution access log event. Version released 01 Jul 2014",
-         |	"self": {
-         |		"vendor": "com.amazon.aws.cloudfront",
-         |		"name": "wd_access_log",
-         |		"format": "jsonschema",
-         |		"version": "1-0-4"
-         |	},
-         |
-         |	"type": "object",
-         |	"properties": {
-         |		"dateTime": {
-         |			"type": "string",
-         |			"format": "date-time"
-         |		},
-         |		"xEdgeLocation": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 32
-         |		},
-         |		"scBytes": {
-         |			"type": ["number", "null"]
-         |		},
-         |		"cIp": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 45
-         |		},
-         |		"csMethod": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 3
-         |		},
-         |		"csHost": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 2000
-         |		},
-         |		"csUriStem": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 8192
-         |		},
-         |		"scStatus": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 3
-         |		},
-         |		"csReferer": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 8192
-         |		},
-         |		"csUserAgent": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 2000
-         |		},
-         |		"csUriQuery": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 8192
-         |		},
-         |		"csCookie": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 4096
-         |		},
-         |		"xEdgeResultType": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 32
-         |		},
-         |		"xEdgeRequestId": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 2000
-         |		},
-         |		"xHostHeader": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 2000
-         |		},
-         |		"csProtocol": {
-         |			"enum": ["http", "https", null]
-         |		},
-         |		"csBytes": {
-         |			"type": ["number", "null"]
-         |		},
-         |		"timeTaken": {
-         |			"type": ["number", "null"]
-         |		},
-         |		"xForwardedFor": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 45
-         |		},
-         |		"sslProtocol": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 32
-         |		},
-         |		"sslCipher": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 64
-         |		},
-         |		"xEdgeResponseResultType": {
-         |			"type": ["string", "null"],
-         |			"maxLength": 32
-         |		}
-         |	},
-         |	"required": ["dateTime"],
-         |	"additionalProperties": false
-         |}
-         |""".stripMargin)
+    val input = json"""
+         {
+         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         	"description": "Schema for a AWS CloudFront web distribution access log event. Version released 01 Jul 2014",
+         	"self": {
+         		"vendor": "com.amazon.aws.cloudfront",
+         		"name": "wd_access_log",
+         		"format": "jsonschema",
+         		"version": "1-0-4"
+         	},
+
+         	"type": "object",
+         	"properties": {
+         		"dateTime": {
+         			"type": "string",
+         			"format": "date-time"
+         		},
+         		"xEdgeLocation": {
+         			"type": ["string", "null"],
+         			"maxLength": 32
+         		},
+         		"scBytes": {
+         			"type": ["number", "null"]
+         		},
+         		"cIp": {
+         			"type": ["string", "null"],
+         			"maxLength": 45
+         		},
+         		"csMethod": {
+         			"type": ["string", "null"],
+         			"maxLength": 3
+         		},
+         		"csHost": {
+         			"type": ["string", "null"],
+         			"maxLength": 2000
+         		},
+         		"csUriStem": {
+         			"type": ["string", "null"],
+         			"maxLength": 8192
+         		},
+         		"scStatus": {
+         			"type": ["string", "null"],
+         			"maxLength": 3
+         		},
+         		"csReferer": {
+         			"type": ["string", "null"],
+         			"maxLength": 8192
+         		},
+         		"csUserAgent": {
+         			"type": ["string", "null"],
+         			"maxLength": 2000
+         		},
+         		"csUriQuery": {
+         			"type": ["string", "null"],
+         			"maxLength": 8192
+         		},
+         		"csCookie": {
+         			"type": ["string", "null"],
+         			"maxLength": 4096
+         		},
+         		"xEdgeResultType": {
+         			"type": ["string", "null"],
+         			"maxLength": 32
+         		},
+         		"xEdgeRequestId": {
+         			"type": ["string", "null"],
+         			"maxLength": 2000
+         		},
+         		"xHostHeader": {
+         			"type": ["string", "null"],
+         			"maxLength": 2000
+         		},
+         		"csProtocol": {
+         			"enum": ["http", "https", null]
+         		},
+         		"csBytes": {
+         			"type": ["number", "null"]
+         		},
+         		"timeTaken": {
+         			"type": ["number", "null"]
+         		},
+         		"xForwardedFor": {
+         			"type": ["string", "null"],
+         			"maxLength": 45
+         		},
+         		"sslProtocol": {
+         			"type": ["string", "null"],
+         			"maxLength": 32
+         		},
+         		"sslCipher": {
+         			"type": ["string", "null"],
+         			"maxLength": 64
+         		},
+         		"xEdgeResponseResultType": {
+         			"type": ["string", "null"],
+         			"maxLength": 32
+         		}
+         	},
+         	"required": ["dateTime"],
+         	"additionalProperties": false
+         }""".schema
 
     val resultContent =
       """|{
@@ -559,7 +552,6 @@ class GenerateSpec extends Specification { def is = s2"""
          |    ]
          |}""".stripMargin
 
-    val input = createSelfDescribingSchema(sourceSchema)
     val output = Generate.transformSnowplow(true, "atomic", 4096, false, false, None)(NonEmptyList.of(input)).jsonPaths.head
 
     val expected = textFile(Paths.get("com.amazon.aws.cloudfront/wd_access_log_1.json"), resultContent)
@@ -633,26 +625,25 @@ class GenerateSpec extends Specification { def is = s2"""
   }
 
   def e8 = {
-    val sourceSchema = parse(
-      """
-        |{
-        |      "$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-        |      "description": "Schema for custom contexts",
-        |	     "self": {
-        |	     	 "vendor": "com.acme.persons",
-        |	     	 "name": "simple",
-        |	     	 "format": "jsonschema",
-        |	     	 "version": "1-0-0"
-        |	     },
-        |
-        |      "type": "object",
-        |      "properties": {
-        |        "name": { "type": "string" },
-        |        "age": { "type": "number" }
-        |      },
-        |      "required":["name"]
-        |}
-      """.stripMargin)
+    val input = json"""
+        {
+              "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+              "description": "Schema for custom contexts",
+        	     "self": {
+        	     	 "vendor": "com.acme.persons",
+        	     	 "name": "simple",
+        	     	 "format": "jsonschema",
+        	     	 "version": "1-0-0"
+        	     },
+
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "age": { "type": "number" }
+              },
+              "required":["name"]
+        }
+      """.schema
 
     val resultContent =
       """|CREATE SCHEMA IF NOT EXISTS atomic;
@@ -666,7 +657,6 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |ALTER TABLE atomic.com_acme_persons_simple_1 OWNER TO storageloader;""".stripMargin
 
-    val input = createSelfDescribingSchema(sourceSchema)
     val ddl = Generate.transformVanilla(false, "atomic", 4096, false, true, Some("storageloader"))(NonEmptyList.of(input))
 
     val expected = Generate.DdlOutput(
@@ -678,10 +668,9 @@ class GenerateSpec extends Specification { def is = s2"""
   }
 
   def e9 = {
-    val initial = createSelfDescribingSchema(
-      parse("""
+    val initial = json"""
         {
-          "$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self":{
             "vendor":"com.acme",
             "name":"example",
@@ -696,13 +685,11 @@ class GenerateSpec extends Specification { def is = s2"""
           },
           "additionalProperties": false
         }
-      """)
-    )
+      """.schema
 
-    val second = createSelfDescribingSchema(
-      parse("""
+    val second = json"""
         {
-          "$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self":{
             "vendor":"com.acme",
             "name":"example",
@@ -721,8 +708,7 @@ class GenerateSpec extends Specification { def is = s2"""
           },
           "additionalProperties": false
         }
-      """)
-    )
+      """.schema
 
     val expectedDdl =
       """|CREATE SCHEMA IF NOT EXISTS atomic;
@@ -777,10 +763,9 @@ class GenerateSpec extends Specification { def is = s2"""
   }
 
   def e10 = {
-    val initial = createSelfDescribingSchema(
-      parse("""
+    val initial = json"""
         {
-          "$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self":{
             "vendor":"com.acme",
             "name":"example",
@@ -799,13 +784,11 @@ class GenerateSpec extends Specification { def is = s2"""
           },
           "additionalProperties": false
         }
-      """)
-    )
+      """.schema
 
-    val second = createSelfDescribingSchema(
-      parse("""
+    val second = json"""
         {
-          "$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self":{
             "vendor":"com.acme",
             "name":"example",
@@ -862,13 +845,11 @@ class GenerateSpec extends Specification { def is = s2"""
           "required": ["a_field"],
           "additionalProperties": false
         }
-      """)
-    )
+      """.schema
 
-    val third = createSelfDescribingSchema(
-      parse("""
+    val third = json"""
         {
-          "$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self":{
             "vendor":"com.acme",
             "name":"example",
@@ -931,8 +912,7 @@ class GenerateSpec extends Specification { def is = s2"""
           "required": ["a_field", "f_field", "e_field"],
           "additionalProperties": false
         }
-      """)
-    )
+      """.schema
 
     val expectedDdl =
       """|CREATE SCHEMA IF NOT EXISTS atomic;
@@ -1075,10 +1055,213 @@ class GenerateSpec extends Specification { def is = s2"""
     output must beEqualTo(expected)
   }
 
+  def e11 = {
+    val schema = json"""
+        {
+         "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         "self":{
+           "vendor":"com.acme",
+           "name":"example",
+           "version":"1-0-0",
+           "format":"jsonschema"
+         },
+         "type": "object",
+         "properties": {
+           "enum_field": {
+             "enum": [
+               "event",
+               "exception",
+               "item"
+             ]
+           },
+           "nonInteractionHit": {
+             "type": ["boolean", "null"]
+           }
+         },
+         "additionalProperties": false
+        }
+      """.schema
 
-  private def createSelfDescribingSchema(schemaJson: JValue): SelfDescribingSchema[Schema] = {
-    val input = SelfDescribingSchema.parse(schemaJson).getOrElse(throw new RuntimeException("Invalid self-describing JSON schema"))
-    val schema = Schema.parse(schemaJson).getOrElse(throw new RuntimeException("Invalid self-describing JSON schema"))
-    SelfDescribingSchema(input.self, schema)
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+        |
+        |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+        |    "schema_vendor"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_name"         VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_format"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_version"      VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "root_id"             CHAR(36)      ENCODE RAW       NOT NULL,
+        |    "root_tstamp"         TIMESTAMP     ENCODE ZSTD      NOT NULL,
+        |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
+        |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "enum_field"          VARCHAR(9)    ENCODE ZSTD,
+        |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
+        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+        |)
+        |DISTSTYLE KEY
+        |DISTKEY (root_id)
+        |SORTKEY (root_tstamp);
+        |
+        |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
+  }
+
+  def e12 = {
+    val schema = json"""
+        {
+         "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         "self":{
+           "vendor":"com.acme",
+           "name":"example",
+           "version":"1-0-0",
+           "format":"jsonschema"
+         },
+         "type": "object",
+         "properties": {
+           "a_field": {
+            "type": "object",
+            "properties": {
+             "enum_field": {
+               "enum": [
+                 "event",
+                 "exception",
+                 "item"
+               ]
+             }
+            }
+           },
+           "nonInteractionHit": {
+             "type": ["boolean", "null"]
+           }
+         },
+         "additionalProperties": false
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+        |
+        |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+        |    "schema_vendor"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_name"         VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_format"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_version"      VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "root_id"             CHAR(36)      ENCODE RAW       NOT NULL,
+        |    "root_tstamp"         TIMESTAMP     ENCODE ZSTD      NOT NULL,
+        |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
+        |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "a_field.enum_field"  VARCHAR(9)    ENCODE ZSTD,
+        |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
+        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+        |)
+        |DISTSTYLE KEY
+        |DISTKEY (root_id)
+        |SORTKEY (root_tstamp);
+        |
+        |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
+  }
+
+  def e13 = {
+    val schema = json"""
+        {
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "self":{
+            "vendor":"com.acme",
+            "name":"example",
+            "version":"1-0-0",
+            "format":"jsonschema"
+          },
+          "type": "object",
+          "properties": {
+            "a_field": { "type": "string" },
+            "b_field": {}
+          }
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+        |
+        |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+        |    "schema_vendor"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "schema_name"    VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "schema_format"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "schema_version" VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "root_id"        CHAR(36)      ENCODE RAW  NOT NULL,
+        |    "root_tstamp"    TIMESTAMP     ENCODE ZSTD NOT NULL,
+        |    "ref_root"       VARCHAR(255)  ENCODE ZSTD NOT NULL,
+        |    "ref_tree"       VARCHAR(1500) ENCODE ZSTD NOT NULL,
+        |    "ref_parent"     VARCHAR(255)  ENCODE ZSTD NOT NULL,
+        |    "a_field"        VARCHAR(4096) ENCODE ZSTD,
+        |    "b_field"        VARCHAR(4096) ENCODE ZSTD,
+        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+        |)
+        |DISTSTYLE KEY
+        |DISTKEY (root_id)
+        |SORTKEY (root_tstamp);
+        |
+        |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
+  }
+
+  def e14 = {
+    val schema = json"""
+        {
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "self":{
+            "vendor":"com.acme",
+            "name":"example",
+            "version":"1-0-0",
+            "format":"jsonschema"
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+         |
+         |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+         |    "schema_vendor"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_name"    VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_format"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_version" VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "root_id"        CHAR(36)      ENCODE RAW  NOT NULL,
+         |    "root_tstamp"    TIMESTAMP     ENCODE ZSTD NOT NULL,
+         |    "ref_root"       VARCHAR(255)  ENCODE ZSTD NOT NULL,
+         |    "ref_tree"       VARCHAR(1500) ENCODE ZSTD NOT NULL,
+         |    "ref_parent"     VARCHAR(255)  ENCODE ZSTD NOT NULL,
+         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+         |)
+         |DISTSTYLE KEY
+         |DISTKEY (root_id)
+         |SORTKEY (root_tstamp);
+         |
+         |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
   }
 }

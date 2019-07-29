@@ -15,50 +15,51 @@ package commands
 
 import java.nio.file.{Path, Paths}
 import java.util.UUID
+import java.net.URI
 
-import cats.data.{ EitherT, NonEmptyList }
-import cats.effect.IO
+import cats.data.{EitherT, NonEmptyList}
+import cats.effect._
 import cats.implicits._
 
-import com.snowplowanalytics.iglu.client.Resolver
-import com.snowplowanalytics.iglu.client.repositories.{EmbeddedRepositoryRef, RepositoryRefConfig}
-import com.snowplowanalytics.iglu.client.validation.ValidatableJValue.validate
+import io.circe._
+
+import com.snowplowanalytics.iglu.client.Client
+import com.snowplowanalytics.iglu.client.resolver.Resolver
+import com.snowplowanalytics.iglu.client.resolver.registries.Registry
+import com.snowplowanalytics.iglu.client.validator.CirceValidator
+
+import com.snowplowanalytics.iglu.core.SelfDescribingData
+import com.snowplowanalytics.iglu.core.circe.implicits._
 
 import com.snowplowanalytics.iglu.ctl.File.readFile
 import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction
-import com.snowplowanalytics.iglu.ctl.Utils.extractKey
 import com.snowplowanalytics.iglu.ctl.Common.Error
-
-import org.json4s._
-import org.json4s.jackson.JsonMethods.compact
-
+import com.snowplowanalytics.iglu.ctl.commands.Deploy.ApiKeySecret.EnvVar
 
 object Deploy {
 
-  lazy val resolver: Resolver = {
-    val embeddedRepo = RepositoryRefConfig("Igluctl Embedded", 1, List("com.snowplowanalytics.iglu"))
-    val embeddedIglu = EmbeddedRepositoryRef(embeddedRepo, "/igluctl")
-    Resolver(5, List(embeddedIglu))
-  }
+  private val tempPath = Paths.get("/temp")
+
+  lazy val resolver: Resolver[IO] = Resolver(List(Registry.EmbeddedRegistry, Registry.IgluCentral), None)
+  lazy val client: Client[IO, Json] = Client(resolver, CirceValidator)
 
   /**
     * Primary method of static deploy command
     * Performs usual schema workflow at once, per configuration file
     * Short-circuits on first failed step
     */
-  def process(configFile: Path): Result = {
+  def process(configFile: Path)(implicit t: Timer[IO]): Result = {
     for {
-      configDoc  <- EitherT(readFile(configFile).map(_.flatMap(_.asJson).toEitherNel))
-      config     <- EitherT(IO(validate(configDoc.content, true)(resolver)
-        .toEither
-        .leftMap(messages => NonEmptyList.fromListUnsafe(messages.list.map(message => Error.ConfigParseError(message.toString))))))
-      cfg        <- EitherT.fromEither[IO](extractConfig(config).toEitherNel)
-      output     <- Lint.process(cfg.lint.input, cfg.lint.skipChecks, cfg.lint.skipWarnings)
-      _          <- Generate.process(cfg.generate.input,
+      configDoc    <- EitherT(readFile(configFile).map(_.flatMap(_.asJson).toEitherNel))
+      selfDescConf <- EitherT.fromEither[IO](SelfDescribingData.parse(configDoc.content).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e.toString))))
+      _            <- client.check(selfDescConf).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e.toString)))
+      cfg          <- EitherT.fromEither[IO](selfDescConf.data.as[IgluctlConfig].leftMap(e => NonEmptyList.of(Error.ConfigParseError(e.toString))))
+      output       <- Lint.process(cfg.lint.input, cfg.lint.skipChecks, cfg.lint.skipWarnings)
+      _            <- Generate.process(cfg.generate.input,
         cfg.generate.output, cfg.generate.withJsonPaths, cfg.generate.rawMode,
         cfg.generate.dbSchema, cfg.generate.varcharSize, cfg.generate.splitProduct,
         cfg.generate.noHeader, cfg.generate.force, cfg.generate.owner)
-      actionsOut <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], ?], List[String]](_.process)
+      actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], ?], List[String]](_.process)
     } yield output ::: actionsOut.flatten
   }
 
@@ -78,109 +79,109 @@ object Deploy {
           uuid <- Either.catchNonFatal(UUID.fromString(value)).leftMap(e => Error.ConfigParseError(e.getMessage))
         } yield uuid
     }
+  }
 
-    def deserialize(json: JValue): Either[MappingException, ApiKeySecret] = json match {
-      case JString(value) if value.startsWith("$") => EnvVar(value.drop(1)).asRight
-      case JString(uuid) => Either.catchNonFatal(UUID.fromString(uuid)) match {
-        case Right(plain) => Plain(plain).asRight
-        case Left(error) => new MappingException(s"apikey can have ENVVAR or UUID format; ${error.getMessage}").asLeft
+  implicit val igluCtlConfigDecoder: Decoder[IgluctlConfig] =
+    Decoder.instance { cursor =>
+      for {
+        description <- cursor.downField("description").as[Option[String]]
+        input       <- cursor.downField("input").as[Path]
+        lint        <- cursor.downField("lint").as[Command.Lint]
+        generate    <- cursor.downField("generate").as[Command.StaticGenerate]
+        actions     <- cursor.downField("actions").as[List[IgluctlAction]]
+      } yield IgluctlConfig(
+        description,
+        lint.copy(input = input),
+        generate.copy(input = input),
+        actions.map {
+          case IgluctlAction.Push(command) => IgluctlAction.Push(command.copy(input = input))
+          case IgluctlAction.S3Cp(command) => IgluctlAction.S3Cp(command.copy(input = input))
+        }
+      )
+    }
+
+  implicit val lintConfigDecoder: Decoder[Command.Lint] =
+    Decoder.instance { cursor =>
+      for {
+        skipWarnings   <- cursor.downField("skipWarnings").as[Boolean]
+        includedChecks <- cursor.downField("includedChecks").as[List[String]]
+        linters <- Lint.parseOptionalLinters(includedChecks.mkString(",")).leftMap(e => DecodingFailure(e.toString, Nil))
+      } yield Command.Lint(tempPath, skipWarnings, linters)
+    }
+
+  implicit val generateConfigDecoder: Decoder[Command.StaticGenerate] =
+    Decoder.instance { cursor =>
+      for {
+        output        <- cursor.downField("output").as[Path]
+        withJsonPaths <- cursor.downField("withJsonPaths").as[Boolean]
+        dbSchema      <- cursor.downField("dbschema").as[String]
+        varcharSize   <- cursor.downField("varcharSize").as[Int]
+        noHeader      <- cursor.downField("noHeader").as[Boolean]
+        force         <- cursor.downField("force").as[Boolean]
+        owner         <- cursor.downField("owner").as[String]
+      } yield Command.StaticGenerate(
+        tempPath, output, dbSchema, Some(owner),
+        varcharSize, withJsonPaths, false, false, noHeader, force
+      )
+    }
+
+  implicit val igluCtlActionDecoder: Decoder[IgluctlAction] =
+    Decoder.instance { cursor =>
+      cursor.downField("action").as[String] match {
+        case Right("s3cp") =>
+          for {
+            bucket     <- cursor.downField("bucketPath").as[String]
+            profile    <- cursor.downField("profile").as[String]
+            region     <- cursor.downField("region").as[String]
+            bucketPath <- bucket.stripPrefix("s3://").split("/").toList match {
+              case b :: Nil => (b, None).asRight
+              case b :: p => (b, Some(p.mkString("/"))).asRight
+              case _ => DecodingFailure("bucketPath has invalid format", cursor.history).asLeft
+            }
+            (b, p) = bucketPath
+          } yield IgluctlAction.S3Cp(Command.StaticS3Cp(tempPath, b, p, None, None, Some(profile), Some(region)))
+        case Right("push") =>
+          for {
+            registryRoot <- cursor.downField("registry").as[Server.HttpUrl]
+            secret       <- cursor.downField("apikey").as[ApiKeySecret]
+            masterApiKey <- secret.value.leftMap(e => DecodingFailure(e.toString, cursor.history))
+            isPublic     <- cursor.downField("isPublic").as[Boolean]
+          } yield IgluctlAction.Push(Command.StaticPush(tempPath, registryRoot, masterApiKey, isPublic))
+        case Right(unknown) =>
+          DecodingFailure(s"Unknown IgluCtl action: $unknown", cursor.history).asLeft
+        case Left(e) =>
+          e.asLeft
       }
-      case _ => new MappingException(s"apikey must be a string, ${compact(json)} given").asLeft
     }
 
-    val serialize: PartialFunction[Any, JValue] = {
-      case EnvVar(name) => JString(name)
-      case Plain(value) => JString(value.toString)
-    }
-
-    val deserializedPartial: PartialFunction[JValue, ApiKeySecret] = {
-      case json => deserialize(json).fold(throw _, identity)
-    }
-
-    implicit object Serializer extends CustomSerializer[ApiKeySecret](
-      (_: Formats) => (deserializedPartial, serialize)
-    )
-  }
-
-  implicit val formats: Formats = DefaultFormats + ApiKeySecret.Serializer
-
-  /** Parse igluctl config object from JSON */
-  def extractConfig(config: JValue): Either[Error, IgluctlConfig] = {
-    val description = (config \ "description").extractOpt[String]
-    val jLint: JValue = config \ "lint"
-    val jGenerate: JValue = config \ "generate"
-    val jActions: JValue = config \ "actions"
-
-    val inputExt = extractKey[String](config, "input")
-
-    inputExt match {
-      case Right(input) =>
-        for {
-          lint <- extractLint(input, jLint)
-          generate <- extractGenerate(input, jGenerate)
-          actions <- extractActions(input, jActions)
-        } yield IgluctlConfig(description, lint, generate, actions)
-      case Left(err) =>
-        err.asLeft
-    }
-  }
-
-  /** Extract `lint` command options from igluctl config */
-  def extractLint(input: String, doc: JValue): Either[Error, Command.Lint] = {
-    for {
-      skipWarnings <- extractKey[Boolean](doc, "skipWarnings")
-      includedChecks <- extractKey[List[String]](doc, "includedChecks")
-      linters <- Lint.parseOptionalLinters(includedChecks.mkString(","))
-    } yield Command.Lint(Paths.get(input), skipWarnings, linters)
-  }
-
-  /** Extract `static generate` options from igluctl config */
-  def extractGenerate(input: String, doc: JValue): Either[Error, Command.StaticGenerate] = {
-    for {
-      output <- extractKey[String](doc, "output")
-      withJsonPaths <-  extractKey[Boolean](doc, "withJsonPaths")
-      dbSchema <- extractKey[Option[String]](doc, "dbSchema")
-      varcharSize <- extractKey[Int](doc, "varcharSize")
-      noHeader <- extractKey[Option[Boolean]](doc, "noHeader")
-      force <- extractKey[Boolean](doc, "force")
-      owner <- extractKey[Option[String]](doc, "owner")
-    } yield Command.StaticGenerate(Paths.get(input), Paths.get(output), dbSchema.getOrElse("atomic"), owner, varcharSize, withJsonPaths, false,
-      false, noHeader.getOrElse(false), force)
-  }
-
-  /** Extract `s3cp` or `push` commands from igluctl config */
-  def extractAction(input: String, actionDoc: JValue): Either[Error, IgluctlAction] = {
-    actionDoc \ "action" match {
-      case JString("s3cp") =>
-        for {
-          bucket <- extractKey[String](actionDoc, "bucketPath")
-          bucketPath <- bucket.stripPrefix("s3://").split("/").toList match {
-            case b :: Nil => (b, None).asRight
-            case b :: p => (b, Some(p.mkString("/"))).asRight
-            case _ => Error.ConfigParseError("bukcetPath has invalid format").asLeft
+  implicit val serverHttpUrlDecoder: Decoder[Server.HttpUrl] =
+    Decoder.instance { cursor =>
+      cursor.as[String].flatMap { url =>
+        Server.HttpUrl
+          .parse(url)
+          .leftMap { e =>
+            DecodingFailure(e.toString, cursor.history)
           }
-          (b, p) = bucketPath
-          profile <- extractKey[Option[String]](actionDoc, "profile")
-          region <- extractKey[Option[String]](actionDoc, "region")
-        } yield IgluctlAction.S3Cp(Command.StaticS3Cp(Paths.get(input), b, p, None, None, profile, region))
-      case JString("push") =>
-        for {
-          registryRoot <- extractKey[String](actionDoc, "registry").flatMap(Server.HttpUrl.parse)
-          secret <- extractKey[ApiKeySecret](actionDoc, "apikey")
-          masterApiKey <- secret.value
-          isPublic <- extractKey[Boolean](actionDoc, "isPublic")
-        } yield IgluctlAction.Push(Command.StaticPush(Paths.get(input), registryRoot, masterApiKey, isPublic))
-      case JString(action) => Error.ConfigParseError(s"Unrecognized action $action").asLeft
-      case _ => Error.ConfigParseError("Action can only be a string").asLeft
+      }
     }
-  }
 
-  /** Extract list of actions from igluctl config */
-  def extractActions(input: String, actions: JValue): Either[Error, List[IgluctlAction]] = {
-    actions match {
-      case JNull => List.empty[IgluctlAction].asRight
-      case JArray(actions: List[JValue]) => actions.traverse(extractAction(input, _))
-      case _ => Error.ConfigParseError("Actions can be either array or null").asLeft
+  implicit val apiKeySecretDecoder: Decoder[ApiKeySecret] =
+    Decoder.instance { cursor =>
+      cursor.as[String].flatMap {
+        case value if value.startsWith("$") => EnvVar(value.drop(1)).asRight
+        case value => Either.catchNonFatal(UUID.fromString(value))
+          .map(uuid => ApiKeySecret.Plain(uuid))
+          .leftMap(e => DecodingFailure(s"apikey can have ENVVAR or UUID format; ${e.getMessage}", cursor.history))
+      }
     }
-  }
+
+  implicit val javaPathCirceDecoder: Decoder[Path] =
+    Decoder.instance { cursor =>
+      cursor.as[String].flatMap { uriString =>
+        val uriStringWithFile = if (!uriString.startsWith("file")) "file://" ++ uriString else uriString
+        Either.catchNonFatal(Paths.get(URI.create(uriStringWithFile)))
+          .leftMap(e => DecodingFailure(s"Error while creating path: $e", cursor.history))
+      }
+    }
+
 }
