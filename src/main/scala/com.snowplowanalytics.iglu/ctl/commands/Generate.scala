@@ -20,6 +20,9 @@ import java.time.{ZoneOffset, ZonedDateTime}
 import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
+import cats.Traverse
+
+import io.circe._
 
 import com.snowplowanalytics.iglu.core.{SchemaMap, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.schemaddl._
@@ -61,18 +64,22 @@ object Generate {
     for {
       _           <- File.checkOutput(output)
       schemaFiles <- EitherT(File.readSchemas(input).map(_.toEither))
-      schemas     <- EitherT(
-        IO.pure[EitherNel[Common.Error, NonEmptyList[IgluSchema]]](
-          schemaFiles.traverse[Option, IgluSchema](
-            s => Schema.parse(s.content.schema)
-              .map(e => SelfDescribingSchema(s.content.self, e))
-          ).toRight(NonEmptyList.one(Common.Error.Message("Error while parsing schema jsons to Schema object")))
-        )
+      schemas     <- EitherT.fromEither[IO](
+        parseSchemaJsonsToSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       )
       result      = produce(schemas)
       messages    <- EitherT(outputResult(output, result, force))
     } yield messages
   }
+
+  /**
+    * Create Schema objects from list of schema jsons
+    */
+  def parseSchemaJsonsToSchemas[F[_] : Traverse](schemas: F[SelfDescribingSchema[Json]]): Either[Common.Error, F[IgluSchema]] =
+    schemas.traverse[Option, IgluSchema] { s =>
+      Schema.parse(s.schema).map(e => SelfDescribingSchema(s.self, e))
+    }.toRight(Common.Error.Message("Error while parsing schema jsons to Schema object"))
+
 
   /**
    * Class holding an aggregated output ready to be written
@@ -202,10 +209,10 @@ object Generate {
                                      noHeader: Boolean,
                                      owner: Option[String])
                                     (schemas: NonEmptyList[IgluSchema]): DdlOutput = {
-    val migrationMap = Migration.buildMigrationMap(schemas.toList)
+    val migrationMap = Migration.buildMigrationMap(schemas).right.getOrElse(Map.empty)
     val migrations = Migrations.reifyMigrationMap(migrationMap, Some(dbSchema), varcharSize)
 
-    val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(schemas.toList, migrationMap)
+    val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(schemas)
     val ddlFiles = orderedSubSchemaMap.map {
       case (schemaMap, subschemas) => produceTable(schemaMap, dbSchema, owner, varcharSize, false, noHeader)(subschemas)
     }.toList
