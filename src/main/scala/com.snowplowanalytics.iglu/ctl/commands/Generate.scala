@@ -21,6 +21,8 @@ import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 
+import io.circe._
+
 import com.snowplowanalytics.iglu.core.{SchemaMap, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.schemaddl._
 import com.snowplowanalytics.iglu.schemaddl.migrations.{Migration,FlatSchema}
@@ -61,18 +63,22 @@ object Generate {
     for {
       _           <- File.checkOutput(output)
       schemaFiles <- EitherT(File.readSchemas(input).map(_.toEither))
-      schemas     <- EitherT(
-        IO.pure[EitherNel[Common.Error, NonEmptyList[IgluSchema]]](
-          schemaFiles.traverse[Option, IgluSchema](
-            s => Schema.parse(s.content.schema)
-              .map(e => SelfDescribingSchema(s.content.self, e))
-          ).toRight(NonEmptyList.one(Common.Error.Message("Error while parsing schema jsons to Schema object")))
-        )
-      )
+      schemas     <- EitherT.fromEither[IO](
+        parseSchemaJsonsToSchemas(schemaFiles.toList.map(_.content))
+          .toRight(NonEmptyList.one(Common.Error.Message("Error while parsing schema jsons to Schema object")))
+      ).map(NonEmptyList.fromListUnsafe)
       result      = produce(schemas)
       messages    <- EitherT(outputResult(output, result, force))
     } yield messages
   }
+
+  /**
+    * Create Schema objects from list of schema jsons
+    */
+  def parseSchemaJsonsToSchemas(schemas: List[SelfDescribingSchema[Json]]): Option[List[IgluSchema]] =
+    schemas.traverse[Option, IgluSchema] { s =>
+      Schema.parse(s.schema).map(e => SelfDescribingSchema(s.self, e))
+    }
 
   /**
    * Class holding an aggregated output ready to be written
