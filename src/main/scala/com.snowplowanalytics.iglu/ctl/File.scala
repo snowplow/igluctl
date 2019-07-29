@@ -18,9 +18,9 @@ import cats.{Eq, Show}
 import cats.implicits._
 import cats.effect.IO
 
-// Json4s
-import org.json4s._
-import org.json4s.jackson.JsonMethods.parse
+// Circe
+import io.circe._
+import io.circe.parser._
 
 // Scala
 import scala.io.Source
@@ -36,9 +36,9 @@ import java.nio.file.{ Path, Paths, Files }
 // Iglu Core
 import com.snowplowanalytics.iglu.core._
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
-import com.snowplowanalytics.iglu.core.json4s.implicits._
+import com.snowplowanalytics.iglu.core.circe.implicits._
 
-import com.snowplowanalytics.iglu.ctl.Common._
+import com.snowplowanalytics.iglu.ctl.Common.Error
 
 sealed trait File[A] extends Serializable { self =>
   def path: Path
@@ -57,13 +57,13 @@ sealed trait File[A] extends Serializable { self =>
 
   /** Transform text file into a JSON Schema file and validate its content and path */
   def asJson(implicit ev: A =:= String): Either[Error, JsonFile] =
-    Either.catchNonFatal(parse(content: String))
+   parse(content: String)
       .leftMap(error => Error.ParseError(path, error.getMessage))
       .map(json => self.withContent(json))
 
   /** Transform JSON file into a JSON Schema file and validate its content and path */
-  def asSchema(implicit ev: A =:= JValue): Either[Error, SchemaFile] = {
-    val jsonContent: JValue = content
+  def asSchema(implicit ev: A =:= Json): Either[Error, SchemaFile] = {
+    val jsonContent: Json = content
     SelfDescribingSchema.parse(jsonContent).leftMap {
       case ParseError.InvalidSchema => Error.ParseError(path, s"Cannot extract Self-describing JSON Schema from JSON file")
       case other =>  Error.ParseError(path, s"JSON Schema in file [${path.toAbsolutePath}] is not valid, ${other.code}")
@@ -116,9 +116,9 @@ object File {
   }
 
   /** Constructor for [[JsonFile]] */
-  def jsonFile(p: Path, json: JValue): JsonFile = new File[JValue] {
+  def jsonFile(p: Path, json: Json): JsonFile = new File[Json] {
     def path: Path = p
-    def content: JValue = json
+    def content: Json = json
   }
 
   /**

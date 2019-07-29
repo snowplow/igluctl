@@ -18,8 +18,8 @@ import java.nio.file.Paths
 
 import com.snowplowanalytics.iglu.core.SchemaVer
 
-// json4s
-import org.json4s.jackson.JsonMethods.parse
+// circe
+import io.circe.literal._
 
 // specs2
 import org.specs2.Specification
@@ -37,59 +37,51 @@ class PushSpec extends Specification { def is = s2"""
 
   def e1 = {
     // valid
-    val schema1 = parse(
-      """
-        |{
-        |  "self": {
-        |    "vendor": "com.acme",
-        |    "name": "event",
-        |    "format": "jsonschema",
-        |    "version": "1-0-2"
-        |  },
-        |  "type": "object"
-        |}
-      """.stripMargin)
+    val schema1 = json"""
+        {
+          "self": {
+            "vendor": "com.acme",
+            "name": "event",
+            "format": "jsonschema",
+            "version": "1-0-2"
+          },
+          "type": "object"
+        }"""
     val jsonFile1 = jsonFile(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), schema1)
 
     ClassLoader.getSystemClassLoader.getResource("")
 
     // invalid SchemaVer
-    val schema2 =  parse(
-      """
-        |{
-        |  "self": {
-        |    "vendor": "com.acme",
-        |    "name": "event",
-        |    "format": "jsonschema",
-        |    "version": "1-0-1"
-        |  },
-        |  "type": "object"
-        |}
-      """.stripMargin)
+    val schema2 =  json"""
+        {
+          "self": {
+            "vendor": "com.acme",
+            "name": "event",
+            "format": "jsonschema",
+            "version": "1-0-1"
+          },
+          "type": "object"
+        }"""
     val jsonFile2 = jsonFile(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), schema2)
 
     // not self-describing
-    val schema3 =  parse(
-      """
-        |{
-        |  "type": "object"
-        |}
-      """.stripMargin)
+    val schema3 = json"""
+        {
+          "type": "object"
+        }"""
     val jsonFile3 = jsonFile(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), schema3)
 
     // not full path
-    val schema4 = parse(
-      """
-        |{
-        |  "self": {
-        |    "vendor": "com.acme",
-        |    "name": "event",
-        |    "format": "jsonschema",
-        |    "version": "1-0-2"
-        |  },
-        |  "type": "object"
-        |}
-      """.stripMargin)
+    val schema4 = json"""
+        {
+          "self": {
+            "vendor": "com.acme",
+            "name": "event",
+            "format": "jsonschema",
+            "version": "1-0-2"
+          },
+          "type": "object"
+        }"""
     val jsonFile4 = jsonFile(Paths.get("/event/jsonschema/1-0-2"), schema4)
 
     val validSchemaExpectation = jsonFile1.asSchema must beRight
