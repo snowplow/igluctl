@@ -42,6 +42,8 @@ lazy val root = project.in(file("."))
       Libraries.scalajHttp,
       Libraries.fs2,
       Libraries.fs2Io,
+      Libraries.doobieCore,
+      Libraries.doobiePostgres,
       // Scala (test only)
       Libraries.specs2,
       Libraries.scalaCheck,
