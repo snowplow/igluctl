@@ -16,6 +16,8 @@ package com.snowplowanalytics.iglu.ctl
 import java.util.UUID
 import java.nio.file.Path
 
+import com.snowplowanalytics.iglu.core.SchemaKey
+
 // cats
 import cats.data.{ ValidatedNel, Validated }
 import cats.implicits._
@@ -47,6 +49,12 @@ object Command {
     def read(string: String): ValidatedNel[String, Server.HttpUrl] =
       Server.HttpUrl.parse(string).leftMap(_.show).toValidatedNel
     def defaultMetavar: String = "uri"
+  }
+
+  implicit val readSchemaKey: Argument[SchemaKey] = new Argument[SchemaKey] {
+    override def read(string: String): ValidatedNel[String, SchemaKey] =
+      SchemaKey.fromUri(string).leftMap(_.toString).toValidatedNel
+    override def defaultMetavar: String = "schemaKey"
   }
 
   // common options
@@ -94,6 +102,21 @@ object Command {
   val vendorPrefix = Opts.option[String]("vendor-prefix", "Vendor prefix to associate with generated key")
     .mapValidated(s => Server.VendorPrefix.fromString(s).toValidatedNel).withDefault(Server.VendorPrefix.Wildcard)
 
+  // Postgres options
+  val dbHost = Opts.option[String]("host", "Database host address")
+  val dbPort = Opts.option[Int]("port", "Database port")
+  val dbName = Opts.option[String]("dbname", "Database name")
+  val dbUserName = Opts.option[String]("username", "Database username")
+  val dbPassword = Opts.option[String]("password", "Database password")
+  val dbDriver = Opts.option[String]("driver", "Database driver").withDefault("org.postgresql.Driver")
+  val dbMaxPoolSize = Opts.option[Int]("maxPoolSize", "Max pool size for database connection thread pool").withDefault(5)
+  val dbConfig = (dbHost, dbPort, dbName, dbUserName, dbPassword, dbDriver, dbMaxPoolSize).mapN(DbConfig.apply)
+
+  // TableCheck options
+  val igluResolver = Opts.option[Path]("resolver", "Iglu resolver config path")
+  val selfDescribingSchema = Opts.option[SchemaKey]("schema", "Schema to check against")
+  val dbSchema = Opts.option[String]("dbschema", "Database schema").withDefault("atomic")
+
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
     (input, output, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
@@ -120,8 +143,13 @@ object Command {
   val server = Opts.subcommand("server", "Communication with Iglu Server") {
     serverKeygen
   }
+  val tableCheck = Opts.subcommand("table-check", "Check given schema's table structure against schema") {
+    (igluResolver, selfDescribingSchema, dbSchema, dbConfig).mapN(TableCheck.apply)
+  }
 
-  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server))
+  val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck)
+
+  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(rdbms))
 
 
   sealed trait IgluctlCommand extends Product with Serializable
@@ -158,6 +186,16 @@ object Command {
                   skipChecks: List[Linter]) extends IgluctlCommand
 
   case class ServerKeygen(server: Server.HttpUrl, masterKey: UUID, vendorPrefix: Server.VendorPrefix) extends IgluctlCommand
+
+  case class DbConfig(host: String,
+                      port: Int,
+                      dbname: String,
+                      username: String,
+                      password: String,
+                      driver: String,
+                      maxPoolSize: Int)
+
+  case class TableCheck(resolver: Path, schema: SchemaKey, dbSchema: String, storageConfig: DbConfig) extends IgluctlCommand
 
 }
 

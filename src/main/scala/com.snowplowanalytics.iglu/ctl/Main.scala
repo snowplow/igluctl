@@ -66,6 +66,10 @@ object Main extends IOApp {
 
       case Right(Command.StaticDeploy(config)) =>
         Deploy.process(config)
+
+      case Right(Command.TableCheck(resolver, schema, dbschema, storageConfig)) =>
+        TableCheck.process(resolver, schema, dbschema, storageConfig)
+
       case Left(e) =>
         EitherT.fromEither[IO](Error.Message(e.toString).asLeft[List[String]].toEitherNel)
     }

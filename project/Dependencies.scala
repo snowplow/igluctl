@@ -32,11 +32,11 @@ object Dependencies {
     val decline          = "0.6.0"
     val scalajHttp       = "2.3.0"
     val fs2              = "1.0.2"
+    val Doobie           = "0.7.0"
     // Scala (test only)
     val specs2           = "4.0.1"
     val scalaCheck       = "1.13.5"
   }
-
 
   object Libraries {
     // Java
@@ -56,6 +56,8 @@ object Dependencies {
     val scalajHttp       = "org.scalaj"                 %% "scalaj-http"               % V.scalajHttp
     val fs2              = "co.fs2"                     %% "fs2-core"                  % V.fs2
     val fs2Io            = "co.fs2"                     %% "fs2-io"                    % V.fs2
+    val doobieCore       = "org.tpolecat"               %% "doobie-core"               % V.Doobie
+    val doobiePostgres   = "org.tpolecat"               %% "doobie-postgres"           % V.Doobie
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2-core"               % V.specs2         % "test"
     val scalaCheck       = "org.scalacheck"             %% "scalacheck"                % V.scalaCheck     % "test"
