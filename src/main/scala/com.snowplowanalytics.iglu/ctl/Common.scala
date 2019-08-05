@@ -21,15 +21,19 @@ import cats.{Foldable, Show}
 import cats.data.{EitherNel, EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
+import cats.Order
 
 import io.circe.{ Error => CirceError, ParsingFailure, DecodingFailure }
 
 import fs2.Stream
 
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SchemaVer}
+import com.snowplowanalytics.iglu.core.SchemaVer.orderingFull
 
 
 object Common {
+
+  implicit val schemaFullCatsOrder: Order[SchemaVer.Full] = Order.fromOrdering(orderingFull)
 
   val liftIO: FunctionK[IO, Failing] = new FunctionK[IO, Failing] {
     def apply[A](fa: IO[A]): Failing[A] = EitherT.liftF(fa)
@@ -128,7 +132,7 @@ object Common {
     val schemaVerGapErrors =
       for {
         (name, schemaMaps) <- schemaMapsGroupByName.toList
-        sortedSchemaMaps = schemaMaps.toList.sortWith(_.version.asString < _.version.asString)
+        sortedSchemaMaps = schemaMaps.sortBy(_.version).toList
         if sortedSchemaMaps.head.version == SchemaVer.Full(1, 0, 0) && existMissingSchemaVersion(sortedSchemaMaps)
       } yield GapError.Gaps(schemaMaps.head.vendor, name)
 
