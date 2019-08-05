@@ -149,11 +149,24 @@ object Server {
     * @param writeKey temporary apikey allowed to write any Schema
     * @return HTTP POST-request ready to be sent
     */
-  def buildRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: String): HttpRequest =
+  def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: String): HttpRequest =
     Http(s"${registryRoot.uri}/api/schemas/${schema.self.schemaKey.toPath}")
       .header("apikey", writeKey)
       .param("isPublic", isPublic.toString)
       .put(schema.asString)
+
+  /**
+    * Build HTTP GET request for all JSON Schemas and authenticated with temporary
+    * read key
+    *
+    * @param registryRoot Iglu server URI
+    * @param readKey temporary apikey allowed to read any Schema
+    * @return HTTP GET request ready to be sent
+    */
+  def buildPullRequest(registryRoot: HttpUrl, readKey: String): HttpRequest =
+    Http(s"${registryRoot.uri}/api/schemas?repr=canonical")
+      .header("apikey", readKey)
+      .header("accept", "application/json")
 
   /**
     * Perform HTTP request bundled with master apikey to create and get
