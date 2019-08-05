@@ -70,6 +70,9 @@ object Main extends IOApp {
       case Right(Command.TableCheck(tableCheckType, dbschema, storageConfig)) =>
         TableCheck.process(tableCheckType, dbschema, storageConfig)
 
+      case Right(Command.VersionFlag) =>
+        EitherT.fromEither[IO](List(generated.ProjectSettings.version).asRight)
+
       case Left(e) =>
         EitherT.fromEither[IO](Error.Message(e.toString).asLeft[List[String]].toEitherNel)
     }
