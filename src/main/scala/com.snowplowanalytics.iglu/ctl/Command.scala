@@ -149,7 +149,9 @@ object Command {
 
   val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck)
 
-  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(rdbms))
+  val version = Opts.flag("version", "Display version").as(VersionFlag)
+
+  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(rdbms).orElse(version))
 
 
   sealed trait IgluctlCommand extends Product with Serializable
@@ -196,6 +198,8 @@ object Command {
                       maxPoolSize: Int)
 
   case class TableCheck(resolver: Path, schema: SchemaKey, dbSchema: String, storageConfig: DbConfig) extends IgluctlCommand
+
+  case object VersionFlag extends IgluctlCommand
 
 }
 
