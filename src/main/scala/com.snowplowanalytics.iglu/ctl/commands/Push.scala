@@ -46,7 +46,7 @@ object Push {
       file   <- streamFiles(inputDir, Some(filterJsonSchemas)).translate[IO, Failing](Common.liftIO).map(_.flatMap(_.asJsonSchema))
       result <- file match {
         case Right(schema) =>
-          val request = Server.buildRequest(registryRoot, isPublic, schema.content, keys.write)
+          val request = Server.buildPushRequest(registryRoot, isPublic, schema.content, keys.write)
           Stream.eval[Failing, Result](postSchema(request))
         case Left(error) =>
           Stream.eval(EitherT.leftT[IO, Result](error))

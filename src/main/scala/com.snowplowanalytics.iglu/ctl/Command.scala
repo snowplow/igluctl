@@ -102,6 +102,9 @@ object Command {
   val staticPush = Opts.subcommand("push", "Upload Schemas from folder onto the Iglu Server") {
     (input, registryRoot, apikey, public).mapN(StaticPush.apply)
   }
+  val staticPull = Opts.subcommand("pull", "Download schemas from Iglu Server to local folder") {
+    (output, registryRoot, apikey).mapN(StaticPull.apply)
+  }
   val staticS3Cp = Opts.subcommand("s3cp", "Upload Schemas or JSON Path files onto S3") {
     (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region).mapN(StaticS3Cp.apply)
   }
@@ -109,7 +112,7 @@ object Command {
     (registryRoot, apikey, vendorPrefix).mapN(ServerKeygen.apply)
   }
   val static = Opts.subcommand("static", "Work with static registry") {
-    staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp)
+    staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull)
   }
   val lint = Opts.subcommand("lint", "Validate JSON schemas") {
     (input, skipWarnings, skipChecks).mapN(Lint.apply)
@@ -139,6 +142,9 @@ object Command {
                         registryRoot: Server.HttpUrl,
                         apikey: UUID,
                         public: Boolean) extends StaticCommand
+  case class StaticPull(output: Path,
+                        registryRoot: Server.HttpUrl,
+                        apikey: UUID) extends StaticCommand
   case class StaticS3Cp(input: Path,
                         bucket: Bucket,
                         s3Path: Option[S3Path],
