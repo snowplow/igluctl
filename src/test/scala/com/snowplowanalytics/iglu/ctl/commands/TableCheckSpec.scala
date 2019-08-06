@@ -12,10 +12,13 @@
  */
 package com.snowplowanalytics.iglu.ctl.commands
 
-import com.snowplowanalytics.iglu.ctl.Common.Error
-import com.snowplowanalytics.iglu.ctl.Storage.Column
+
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 
 import com.snowplowanalytics.iglu.schemaddl.redshift.{RedshiftInteger, Column => DDLColumn}
+
+import com.snowplowanalytics.iglu.ctl.Storage.Column
+import com.snowplowanalytics.iglu.ctl.commands.TableCheck.TableCheckResult
 
 import org.specs2.Specification
 
@@ -24,8 +27,12 @@ class TableCheckSpec extends Specification { def is =s2"""
     returns error when there are more expected columns than existing columns $e1
     returns error when there are more existing columns than expected columns $e2
     returns error when number columns are equal but their names are different $e3
-    returns success when existing and expected columns are matched with each other $e4
+    returns error when existing and expected column names are same but with different order $e4
+    returns error when existing columns list is empty $e5
+    returns success when existing and expected columns are matched with each other $e6
   """
+
+  val schemaKey = SchemaKey("com.vendor", "example", "jsonschema", SchemaVer.Full(1, 0, 0))
 
   def e1 = {
     val existingColumns = List(
@@ -37,12 +44,11 @@ class TableCheckSpec extends Specification { def is =s2"""
       DDLColumn("c", RedshiftInteger),
       DDLColumn("d", RedshiftInteger)
     )
-    TableCheck.checkColumns(existingColumns, expectedColumns) must beLeft(
-      Error.Message(
-        """
-          |Existing and expected columns are different:
-          |  existing: a,b,c
-          |  expected: a,b,c,d""".stripMargin
+    TableCheck.checkColumns(schemaKey, existingColumns, expectedColumns) must beEqualTo(
+      TableCheckResult.TableUnmatched(
+        schemaKey,
+        existingColumns,
+        expectedColumns
       )
     )
   }
@@ -56,12 +62,11 @@ class TableCheckSpec extends Specification { def is =s2"""
       DDLColumn("b", RedshiftInteger),
       DDLColumn("c", RedshiftInteger)
     )
-    TableCheck.checkColumns(existingColumns, expectedColumns) must beLeft(
-      Error.Message(
-        """
-          |Existing and expected columns are different:
-          |  existing: a,b,c,d
-          |  expected: a,b,c""".stripMargin
+    TableCheck.checkColumns(schemaKey, existingColumns, expectedColumns) must beEqualTo(
+      TableCheckResult.TableUnmatched(
+        schemaKey,
+        existingColumns,
+        expectedColumns
       )
     )
   }
@@ -77,17 +82,50 @@ class TableCheckSpec extends Specification { def is =s2"""
       DDLColumn("d", RedshiftInteger),
       DDLColumn("e", RedshiftInteger)
     )
-    TableCheck.checkColumns(existingColumns, expectedColumns) must beLeft(
-      Error.Message(
-        """
-          |Existing and expected columns are different:
-          |  existing: a,b,c,f,g
-          |  expected: a,b,c,d,e""".stripMargin
+    TableCheck.checkColumns(schemaKey, existingColumns, expectedColumns) must beEqualTo(
+      TableCheckResult.TableUnmatched(
+        schemaKey,
+        existingColumns,
+        expectedColumns
       )
     )
   }
 
   def e4 = {
+    val existingColumns = List(
+      Column("a"), Column("b"), Column("e"), Column("c"), Column("d")
+    )
+    val expectedColumns = List(
+      DDLColumn("a", RedshiftInteger),
+      DDLColumn("b", RedshiftInteger),
+      DDLColumn("c", RedshiftInteger),
+      DDLColumn("d", RedshiftInteger),
+      DDLColumn("e", RedshiftInteger)
+    )
+    TableCheck.checkColumns(schemaKey, existingColumns, expectedColumns) must beEqualTo(
+      TableCheckResult.TableUnmatched(
+        schemaKey,
+        existingColumns,
+        expectedColumns
+      )
+    )
+  }
+
+  def e5 = {
+    val existingColumns = List.empty
+    val expectedColumns = List(
+      DDLColumn("a", RedshiftInteger),
+      DDLColumn("b", RedshiftInteger),
+      DDLColumn("c", RedshiftInteger),
+      DDLColumn("d", RedshiftInteger),
+      DDLColumn("e", RedshiftInteger)
+    )
+    TableCheck.checkColumns(schemaKey, existingColumns, expectedColumns) must beEqualTo(
+      TableCheckResult.TableNotDeployed(schemaKey)
+    )
+  }
+
+  def e6 = {
     val existingColumns = List(
       Column("a"), Column("b"), Column("c"), Column("d"), Column("e")
     )
@@ -98,6 +136,8 @@ class TableCheckSpec extends Specification { def is =s2"""
       DDLColumn("d", RedshiftInteger),
       DDLColumn("e", RedshiftInteger)
     )
-    TableCheck.checkColumns(existingColumns, expectedColumns) must beRight
+    TableCheck.checkColumns(schemaKey, existingColumns, expectedColumns) must beEqualTo(
+      TableCheckResult.TableMatched(schemaKey)
+    )
   }
 }

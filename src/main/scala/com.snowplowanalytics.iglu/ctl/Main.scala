@@ -67,8 +67,8 @@ object Main extends IOApp {
       case Right(Command.StaticDeploy(config)) =>
         Deploy.process(config)
 
-      case Right(Command.TableCheck(resolver, schema, dbschema, storageConfig)) =>
-        TableCheck.process(resolver, schema, dbschema, storageConfig)
+      case Right(Command.TableCheck(resolver, schema, igluServerUrl, apikey, dbschema, storageConfig)) =>
+        TableCheck.process(resolver, schema, igluServerUrl, apikey, dbschema, storageConfig)
 
       case Right(Command.VersionFlag) =>
         EitherT.fromEither[IO](List(generated.ProjectSettings.version).asRight)

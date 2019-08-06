@@ -13,10 +13,13 @@
 package com.snowplowanalytics.iglu.ctl.commands
 
 import java.nio.file.Path
+import java.util.UUID
 
 import cats.data.{EitherT, NonEmptyList}
 import cats.implicits._
-import cats.effect.{ContextShift, IO}
+import cats.effect._
+import cats.data._
+import cats.Show
 
 import fs2.Stream
 
@@ -32,42 +35,156 @@ import com.snowplowanalytics.iglu.schemaddl.migrations.Migration
 import com.snowplowanalytics.iglu.schemaddl.redshift.{CreateTable, Column => DDLColumn}
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.DdlGenerator
 
-import com.snowplowanalytics.iglu.ctl.File
+import com.snowplowanalytics.iglu.ctl.{File, Server}
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.Storage.Column
 import com.snowplowanalytics.iglu.ctl.{Common, Result, Storage}
 import com.snowplowanalytics.iglu.ctl.Command.DbConfig
 import com.snowplowanalytics.iglu.ctl.IOInstances._
+import com.snowplowanalytics.iglu.ctl.Failing
+import com.snowplowanalytics.iglu.ctl.Utils.modelGroup
+import com.snowplowanalytics.iglu.ctl.commands.TableCheck.TableCheckResult._
+
 
 object TableCheck {
+
+  /**
+    * Represents result of one table check process
+    */
+  sealed trait TableCheckResult extends Product with Serializable
+  object TableCheckResult {
+    /**
+      * Represents cases where table has expected structure
+      * @param schema schema which its corresponding table is
+      *               checked against
+      */
+    case class TableMatched(schema: SchemaKey) extends TableCheckResult
+
+    /**
+      * Represents cases where table does not have expected structure
+      * @param schema schema which its corresponding table is
+      *               checked against
+      * @param existingColumns existing columns of table
+      * @param expectedColumns expected columns of table
+      */
+    case class TableUnmatched(schema: SchemaKey, existingColumns: List[Column], expectedColumns: List[DDLColumn]) extends TableCheckResult
+
+    /**
+      * Represents cases where expected table is not deployed
+      * @param schema schema which its corresponding table is
+      *               checked against
+      */
+    case class TableNotDeployed(schema: SchemaKey) extends TableCheckResult
+  }
+
+  /**
+    * Container to collect all table check results in the end
+    */
+  case class AggregatedTableCheckResults(matchedResults: List[TableMatched] = List.empty,
+                                         unmatchedResults: List[TableUnmatched] = List.empty,
+                                         notDeployedResults: List[TableNotDeployed] = List.empty)
+
+  implicit val tableCheckResultShow: Show[TableCheckResult] = Show.show {
+    case TableMatched(schemaKey) =>
+      s"Corresponding table of ${schemaKey.toSchemaUri} is matched"
+    case TableUnmatched(schemaKey, existingColumns, expectedColumns) =>
+      s"""|Corresponding table of ${schemaKey.toSchemaUri} is not matched
+         |  Existing columns: ${existingColumns.map(_.columnName).mkString(",")}
+         |  Expected columns: ${expectedColumns.map(_.columnName).mkString(",")}""".stripMargin
+    case TableNotDeployed(schemaKey) =>
+      s"Corresponding table of ${schemaKey.toSchemaUri} is not deployed"
+  }
+
+  implicit val aggregatedTableCheckResultsShow: Show[AggregatedTableCheckResults] = Show.show {
+    case AggregatedTableCheckResults(matchedResults, unmatchedResults, notDeployedResults) =>
+      s"""
+         |${createSection("Matched:", matchedResults.map((_: TableCheckResult).show).mkString("\n"))}
+         |
+         |${createSection("Unmatched:", unmatchedResults.map((_: TableCheckResult).show).mkString("\n"))}
+         |
+         |${createSection("Not deployed:", notDeployedResults.map((_: TableCheckResult).show).mkString("\n"))}
+         |
+         |Total Matched: ${matchedResults.length}, Total Unmatched: ${unmatchedResults.length}, Total Not Deployed: ${notDeployedResults.length}
+       """.stripMargin.split("\n").filter(_.nonEmpty).mkString("\n")
+  }
 
   /**
     * Primary method of table-check command. Checks whether table of the given schema
     * has expected structure which is determined with last and previous versions of
     * the given schema
     */
-  def process(resolver: Path, schema: SchemaKey, dbschema: String, storageConfig: DbConfig): Result = {
-    import scala.concurrent.ExecutionContext.global
-    implicit val cs: ContextShift[IO] = IO.contextShift(global)
-
+  def process(resolver: Option[Path],
+              schemaKey: Option[SchemaKey],
+              igluServerUrl: Option[Server.HttpUrl],
+              apikey: Option[UUID],
+              dbschema: String,
+              storageConfig: DbConfig)(implicit cs: ContextShift[IO]): Result = {
     val stream = for {
-      storage         <- Stream.resource(Storage.initialize[IO](storageConfig))
-      existingColumns <- Stream.eval(storage.getColumns(SchemaDDLStringUtils.getTableName(SchemaMap(schema)), dbschema))
-      expectedColumns <- Stream.eval(createColumnsFromSchema(resolver, schema, dbschema).value)
-    } yield expectedColumns.flatMap(checkColumns(existingColumns, _))
+      storage <- Stream.resource(Storage.initialize[IO](storageConfig))
+      res     <- {
+        val checkRes: Failing[List[TableCheckResult]] = (resolver, schemaKey, igluServerUrl, apikey) match {
+          case (Some(r), Some(s), None, None) =>
+            tableCheckSingle(r, s, storage, dbschema).map(r => List(r))
+          case (None, None, Some(igluUrl), a) =>
+            tableCheckMultiple(igluUrl, a, storage, dbschema).compile.toList
+          case _ =>
+            EitherT.fromEither[IO](Common.Error.Message("Either resolver/schema or igluUrl/igluApikey should be provided").asLeft[List[TableCheckResult]])
+        }
+        Stream.eval(checkRes.value)
+      }
+    } yield res
 
-    EitherT(stream.compile.toList.map(_.sequence[Either[Common.Error, ?], Unit]))
+    EitherT(stream.compile.toList.map(_.sequence[Either[Common.Error, ?], List[TableCheckResult]]))
       .leftMap(e => NonEmptyList.of(e))
-      .map(_ => List("Table matched with given schema"))
+      .map(l => List(aggregateResults(l.flatten).show))
   }
 
   /**
-    * Build expected table structure with given schema key.
-    * Initially, it creates resolver with given resolver config and fetches
-    * necessary schemas with given schema key. After, it builds table structure
-    * using these schemas
+    * Checks corresponding table of given schemaKey against expected table definition
+    * Expected table definition is created using model group schemas of given schemaKey
+    * Returns whether corresponding table is matched or not in the end
     */
-  def createColumnsFromSchema(resolverPath: Path, schemaKey: SchemaKey, dbSchema: String): EitherT[IO, Common.Error, List[DDLColumn]] = {
+  def checkTable(storage: Storage[IO], schemaKeyOfLastVersion: SchemaKey, modelGroupSchemas: List[IgluSchema], dbSchema: String): Failing[TableCheckResult] = {
+    val res = for {
+      existingColumns <- storage.getColumns(SchemaDDLStringUtils.getTableName(SchemaMap(schemaKeyOfLastVersion)), dbSchema)
+      expectedColumns <- IO.pure(buildTableDdl(modelGroupSchemas))
+    } yield expectedColumns.map(checkColumns(schemaKeyOfLastVersion, existingColumns, _))
+    EitherT(res)
+  }
+
+  /**
+    * Fetches model group schemas of given schemaKey with Iglu Client
+    * and checks corresponding table structure against expected table
+    * structure
+    * Returns whether corresponding table is matched or not in the end
+    */
+  def tableCheckSingle(resolver: Path, schemaKey: SchemaKey, storage: Storage[IO], dbschema: String): Failing[TableCheckResult] =
+    for {
+      schemas <- fetchSchemaModelGroup(resolver, schemaKey)
+      res     <- checkTable(storage, schemaKey, schemas, dbschema)
+    } yield res
+
+  /**
+    * Fetches all schemas from given Iglu registry and checks whether
+    * corresponding tables of all the schemas is matching or not
+    * Returns result stream of table check processes in the end
+    */
+  def tableCheckMultiple(registryRoot: Server.HttpUrl, masterApiKey: Option[UUID], storage: Storage[IO], dbschema: String): Stream[Failing, TableCheckResult] =
+    for {
+      keys        <- Pull.getKeys(registryRoot, masterApiKey)
+      schemaJsons <- Stream.eval(Pull.getSchemas(Server.buildPullRequest(registryRoot, keys)))
+      schemas     <- Stream.eval(EitherT.fromEither[IO](Generate.parseSchemaJsonsToSchemas(schemaJsons)))
+      modelGroupMap = createModelGroups(schemas)
+      temp        <- Stream.emits[Failing, (SchemaKey, List[IgluSchema])](modelGroupMap.toList)
+      (schemaKey, schemaModelGroup) = temp
+      res         <- Stream.eval(checkTable(storage, schemaKey, schemaModelGroup, dbschema))
+    } yield res
+
+  /**
+    * Fetches model group schemas of given schemaKey with resolver which is created
+    * from given resolver config
+    */
+  def fetchSchemaModelGroup(resolverPath: Path, schemaKey: SchemaKey): Failing[List[IgluSchema]] =
     for {
       resolverJson <- EitherT(File.readFile(resolverPath).map(_.flatMap(_.asJson)))
       resolver     <- EitherT(Resolver.parse[IO](resolverJson.content))
@@ -75,45 +192,73 @@ object TableCheck {
       schemaJsons  <- resolver.fetchSchemas(schemaKey.vendor, schemaKey.name, Some(schemaKey.version.model))
         .leftMap(e => Error.ServiceError(s"Error while lookup for schema: ${(e: ClientError).asJson.noSpaces}"))
         .map(_.filter(s => Ordering[SchemaVer].gteq(schemaKey.version, s.self.schemaKey.version)))
-      schemas      <- EitherT.fromEither[IO](
-          Generate.parseSchemaJsonsToSchemas(schemaJsons)
-            .toRight(Common.Error.Message("Error while parsing schema jsons to Schema object"))
-        )
-      tableDdl     <- EitherT.fromEither[IO](buildTableDdl(schemas, dbSchema))
-    } yield tableDdl.columns
-  }
+      schemas      <- EitherT.fromEither[IO](Generate.parseSchemaJsonsToSchemas(schemaJsons))
+    } yield schemas
 
   /**
     * Creates table structure with given schemas
     */
-  def buildTableDdl(schemas: List[IgluSchema], dbSchema: String): Either[Common.Error, CreateTable] = {
-    val migrationMap = Migration.buildMigrationMap(schemas)
-    val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(schemas, migrationMap)
-    orderedSubSchemaMap.toList match {
-      case (_, orderedSubSchemas)::Nil =>
-        DdlGenerator.generateTableDdl(orderedSubSchemas, "", Some(dbSchema), 4096, false).asRight[Common.Error]
-      case Nil =>
-        Error.Message("There is no ordered subschemas to generate table ddl").asLeft[CreateTable]
-      case l =>
-        Error.Message(s"There must be only one ordered subschemas to generate table ddl but there are multiple: ${l.map(_._1)}").asLeft[CreateTable]
+  def buildTableDdl(schemas: List[IgluSchema]): Either[Common.Error, List[DDLColumn]] =
+    NonEmptyList.fromList(schemas) match {
+      case None => List.empty[DDLColumn].asRight
+      case Some(nonEmptySchemas) =>
+        val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(nonEmptySchemas)
+        val res = orderedSubSchemaMap.toList match {
+          case (_, orderedSubSchemas)::Nil =>
+            DdlGenerator.generateTableDdl(orderedSubSchemas, "", None, 4096, false).asRight[Common.Error]
+          case Nil =>
+            Error.Message("There is no ordered subschemas to generate table ddl").asLeft[CreateTable]
+          case l =>
+            Error.Message(s"There must be only one ordered subschemas to generate table ddl but there are multiple: ${l.map(_._1)}").asLeft[CreateTable]
+        }
+        res.map(_.columns)
     }
-  }
 
   /**
     * Compares existing and expected columns whether they are same or not.
     */
-  private[ctl] def checkColumns(existingColumns: List[Column], expectedColumns: List[DDLColumn]): Either[Common.Error, Unit] = {
-    expectedColumns.map(_.columnName).zipAll(existingColumns.map(_.columnName), "", "").foldLeft(List.empty[(String, String)]) {
-      case (acc, (expected, existing)) =>
-        if (!expected.equals(existing)) (existing, expected) :: acc else acc
-    } match {
-      case Nil => ().asRight[Common.Error]
-      case l => Error.Message(
-        s"""
-           |Existing and expected columns are different:
-           |  existing: ${existingColumns.map(_.columnName).mkString(",")}
-           |  expected: ${expectedColumns.map(_.columnName).mkString(",")}""".stripMargin
-      ).asLeft[Unit]
+  private[ctl] def checkColumns(schemaKey: SchemaKey, existingColumns: List[Column], expectedColumns: List[DDLColumn]): TableCheckResult =
+    existingColumns match {
+      case Nil => TableNotDeployed(schemaKey)
+      case _ =>
+        expectedColumns.map(_.columnName).zipAll(existingColumns.map(_.columnName), "", "").foldLeft(List.empty[(String, String)]) {
+          case (acc, (expected, existing)) =>
+            if (!expected.equals(existing)) (existing, expected) :: acc else acc
+        } match {
+          case Nil => TableMatched(schemaKey)
+          case _ => TableUnmatched(schemaKey, existingColumns, expectedColumns)
+        }
     }
+
+  /**
+    * Groups given schemas with their model groups
+    * Keys of the map in the end are schemaKeys of last version
+    * schemas of corresponding model group
+    */
+  private def createModelGroups(schemas: List[IgluSchema]): Map[SchemaKey, List[IgluSchema]] = {
+    schemas
+      .groupBy(s => modelGroup(s.self))
+      .map {
+        case (_, modelGroupSchemas) =>
+          val lastVersionSchemaKey = modelGroupSchemas.maxBy(_.self.schemaKey.version).self.schemaKey
+          (lastVersionSchemaKey, modelGroupSchemas)
+      }
+  }
+
+  private def aggregateResults(results: List[TableCheckResult]): AggregatedTableCheckResults =
+    results.foldLeft(AggregatedTableCheckResults()) {
+      case (acc, result) => result match {
+        case i: TableMatched => acc.copy(matchedResults = i :: acc.matchedResults)
+        case i: TableUnmatched => acc.copy(unmatchedResults = i :: acc.unmatchedResults)
+        case i: TableNotDeployed => acc.copy(notDeployedResults = i :: acc.notDeployedResults)
+      }
+    }
+
+  private def createSection(sectionHeader: String, section: String): String = {
+    if (section.isEmpty) ""
+    else
+      s"""
+         |$sectionHeader
+         |$section""".stripMargin
   }
 }

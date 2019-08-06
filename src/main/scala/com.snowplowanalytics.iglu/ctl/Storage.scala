@@ -42,15 +42,15 @@ object Storage {
   case class Column(columnName: String)
 
   def initialize[F[_]: Effect: ContextShift](storageConfig: DbConfig): Resource[F, Storage[F]] = storageConfig match {
-    case DbConfig(host, port, dbname, username, password, driver, maxPoolSize) =>
-      val url = s"jdbc:postgresql://$host:$port/$dbname"
+    case DbConfig(host, port, dbname, username, password) =>
+      val url = s"jdbc:postgresql://$host:$port/$dbname?loggerLevel=OFF"
       for {
         blockingContext <- {
-          val alloc = Sync[F].delay(Executors.newFixedThreadPool(maxPoolSize))
+          val alloc = Sync[F].delay(Executors.newSingleThreadExecutor())
           val free  = (es: ExecutorService) => Sync[F].delay(es.shutdown())
           Resource.make(alloc)(free).map(ExecutionContext.fromExecutor)
         }
-        xa: Transactor[F] = Transactor.fromDriverManager[F](driver, url, username, password, blockingContext)
+        xa: Transactor[F] = Transactor.fromDriverManager[F]("org.postgresql.Driver", url, username, password, blockingContext)
       } yield Storage(xa)
   }
 }
