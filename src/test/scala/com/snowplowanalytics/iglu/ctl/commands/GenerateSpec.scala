@@ -37,6 +37,10 @@ class GenerateSpec extends Specification { def is = s2"""
     correctly setup table ownership $e8
     correctly create migrations from 1-0-0 to 1-0-1 $e9
     correctly create migrations from 1-0-0 to 1-0-2 $e10
+    correctly create ddl for schema with enum $e11
+    correctly create ddl for schema with nested enum $e12
+    correctly create ddl for schema with field without type $e13
+    correctly create ddl for empty schema $e14
   """
 
 
@@ -1047,6 +1051,216 @@ class GenerateSpec extends Specification { def is = s2"""
       Nil,
       Nil
     )
+
+    output must beEqualTo(expected)
+  }
+
+  def e11 = {
+    val schema = json"""
+        {
+         "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         "self":{
+           "vendor":"com.acme",
+           "name":"example",
+           "version":"1-0-0",
+           "format":"jsonschema"
+         },
+         "type": "object",
+         "properties": {
+           "enum_field": {
+             "enum": [
+               "event",
+               "exception",
+               "item"
+             ]
+           },
+           "nonInteractionHit": {
+             "type": ["boolean", "null"]
+           }
+         },
+         "additionalProperties": false
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+        |
+        |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+        |    "schema_vendor"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_name"         VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_format"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_version"      VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "root_id"             CHAR(36)      ENCODE RAW       NOT NULL,
+        |    "root_tstamp"         TIMESTAMP     ENCODE ZSTD      NOT NULL,
+        |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
+        |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "enum_field"          VARCHAR(9)    ENCODE ZSTD,
+        |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
+        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+        |)
+        |DISTSTYLE KEY
+        |DISTKEY (root_id)
+        |SORTKEY (root_tstamp);
+        |
+        |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
+  }
+
+  def e12 = {
+    val schema = json"""
+        {
+         "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         "self":{
+           "vendor":"com.acme",
+           "name":"example",
+           "version":"1-0-0",
+           "format":"jsonschema"
+         },
+         "type": "object",
+         "properties": {
+           "a_field": {
+            "type": "object",
+            "properties": {
+             "enum_field": {
+               "enum": [
+                 "event",
+                 "exception",
+                 "item"
+               ]
+             }
+            }
+           },
+           "nonInteractionHit": {
+             "type": ["boolean", "null"]
+           }
+         },
+         "additionalProperties": false
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+        |
+        |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+        |    "schema_vendor"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_name"         VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_format"       VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "schema_version"      VARCHAR(128)  ENCODE ZSTD      NOT NULL,
+        |    "root_id"             CHAR(36)      ENCODE RAW       NOT NULL,
+        |    "root_tstamp"         TIMESTAMP     ENCODE ZSTD      NOT NULL,
+        |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
+        |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
+        |    "a_field.enum_field"  VARCHAR(9)    ENCODE ZSTD,
+        |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
+        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+        |)
+        |DISTSTYLE KEY
+        |DISTKEY (root_id)
+        |SORTKEY (root_tstamp);
+        |
+        |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
+  }
+
+  def e13 = {
+    val schema = json"""
+        {
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "self":{
+            "vendor":"com.acme",
+            "name":"example",
+            "version":"1-0-0",
+            "format":"jsonschema"
+          },
+          "type": "object",
+          "properties": {
+            "a_field": { "type": "string" },
+            "b_field": {}
+          }
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+        |
+        |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+        |    "schema_vendor"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "schema_name"    VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "schema_format"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "schema_version" VARCHAR(128)  ENCODE ZSTD NOT NULL,
+        |    "root_id"        CHAR(36)      ENCODE RAW  NOT NULL,
+        |    "root_tstamp"    TIMESTAMP     ENCODE ZSTD NOT NULL,
+        |    "ref_root"       VARCHAR(255)  ENCODE ZSTD NOT NULL,
+        |    "ref_tree"       VARCHAR(1500) ENCODE ZSTD NOT NULL,
+        |    "ref_parent"     VARCHAR(255)  ENCODE ZSTD NOT NULL,
+        |    "a_field"        VARCHAR(4096) ENCODE ZSTD,
+        |    "b_field"        VARCHAR(4096) ENCODE ZSTD,
+        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+        |)
+        |DISTSTYLE KEY
+        |DISTKEY (root_id)
+        |SORTKEY (root_tstamp);
+        |
+        |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
+
+    output must beEqualTo(expected)
+  }
+
+  def e14 = {
+    val schema = json"""
+        {
+          "$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+          "self":{
+            "vendor":"com.acme",
+            "name":"example",
+            "version":"1-0-0",
+            "format":"jsonschema"
+          },
+          "type": "object",
+          "additionalProperties": false
+        }
+      """.schema
+
+    val expectedDdl =
+      """|CREATE SCHEMA IF NOT EXISTS atomic;
+         |
+         |CREATE TABLE IF NOT EXISTS atomic.com_acme_example_1 (
+         |    "schema_vendor"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_name"    VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_format"  VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_version" VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "root_id"        CHAR(36)      ENCODE RAW  NOT NULL,
+         |    "root_tstamp"    TIMESTAMP     ENCODE ZSTD NOT NULL,
+         |    "ref_root"       VARCHAR(255)  ENCODE ZSTD NOT NULL,
+         |    "ref_tree"       VARCHAR(1500) ENCODE ZSTD NOT NULL,
+         |    "ref_parent"     VARCHAR(255)  ENCODE ZSTD NOT NULL,
+         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+         |)
+         |DISTSTYLE KEY
+         |DISTKEY (root_id)
+         |SORTKEY (root_tstamp);
+         |
+         |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
+
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+
+    val output = Generate.transformSnowplow(false, "atomic", 4096, false, true, None)(NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
