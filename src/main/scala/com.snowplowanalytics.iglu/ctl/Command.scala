@@ -53,7 +53,7 @@ object Command {
 
   implicit val readSchemaKey: Argument[SchemaKey] = new Argument[SchemaKey] {
     override def read(string: String): ValidatedNel[String, SchemaKey] =
-      SchemaKey.fromUri(string).leftMap(_.toString).toValidatedNel
+      SchemaKey.fromUri(string).leftMap(_.code).toValidatedNel
     override def defaultMetavar: String = "schemaKey"
   }
 
@@ -102,19 +102,32 @@ object Command {
   val vendorPrefix = Opts.option[String]("vendor-prefix", "Vendor prefix to associate with generated key")
     .mapValidated(s => Server.VendorPrefix.fromString(s).toValidatedNel).withDefault(Server.VendorPrefix.Wildcard)
 
-  // Postgres options
-  val dbHost = Opts.option[String]("host", "Database host address")
-  val dbPort = Opts.option[Int]("port", "Database port")
-  val dbName = Opts.option[String]("dbname", "Database name")
-  val dbUserName = Opts.option[String]("username", "Database username")
-  val dbPassword = Opts.option[String]("password", "Database password")
-  val dbDriver = Opts.option[String]("driver", "Database driver").withDefault("org.postgresql.Driver")
-  val dbMaxPoolSize = Opts.option[Int]("maxPoolSize", "Max pool size for database connection thread pool").withDefault(5)
-  val dbConfig = (dbHost, dbPort, dbName, dbUserName, dbPassword, dbDriver, dbMaxPoolSize).mapN(DbConfig.apply)
+  // database options
+  val dbPort = Opts.option[Int]("port", "Database port").withDefault(5439)
+  val dbHost = Opts.option[String]("host", "Database host address").orNone.mapValidated(
+    resolveOptArgument("PGHOST", "Database host address", _)
+  )
+  val dbName = Opts.option[String]("dbname", "Database name").orNone.mapValidated(
+    resolveOptArgument("PGDATABASE", "Database name", _)
+  )
+  val dbUserName = Opts.option[String]("username", "Database username").orNone.mapValidated(
+    resolveOptArgument("PGUSER", "Database username", _)
+  )
+  val dbPassword = Opts.option[String]("password", "Database password").orNone.mapValidated(
+    resolveOptArgument("PGPASSWORD", "Database password", _)
+  )
+  val dbConfig = (dbHost, dbPort, dbName, dbUserName, dbPassword).mapN(DbConfig.apply)
+
+  def resolveOptArgument(envVariable: String, nameInErrorMsg: String, optionalArg: Option[String]): ValidatedNel[String, String] =
+    optionalArg.map(_.validNel).getOrElse {
+      sys.env.get(envVariable).toValidNel(s"$nameInErrorMsg is not given as argument and it is not set as env variable")
+    }
 
   // TableCheck options
-  val igluResolver = Opts.option[Path]("resolver", "Iglu resolver config path")
-  val selfDescribingSchema = Opts.option[SchemaKey]("schema", "Schema to check against")
+  val igluResolver = Opts.option[Path]("resolver", "Iglu resolver config path").orNone
+  val selfDescribingSchema = Opts.option[SchemaKey]("schema", "Schema to check against").orNone
+  val igluServerUrl = Opts.option[Server.HttpUrl]("server", "Iglu Server URL").orNone
+  val igluServerApiKey = Opts.option[UUID]("apikey", "Iglu Server ApiKey").orNone
   val dbSchema = Opts.option[String]("dbschema", "Database schema").withDefault("atomic")
 
   // subcommands
@@ -126,7 +139,7 @@ object Command {
     (input, registryRoot, apikey, public).mapN(StaticPush.apply)
   }
   val staticPull = Opts.subcommand("pull", "Download schemas from Iglu Server to local folder") {
-    (output, registryRoot, apikey).mapN(StaticPull.apply)
+    (output, registryRoot, apikey.orNone).mapN(StaticPull.apply)
   }
   val staticS3Cp = Opts.subcommand("s3cp", "Upload Schemas or JSON Path files onto S3") {
     (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region).mapN(StaticS3Cp.apply)
@@ -144,7 +157,7 @@ object Command {
     serverKeygen
   }
   val tableCheck = Opts.subcommand("table-check", "Check given schema's table structure against schema") {
-    (igluResolver, selfDescribingSchema, dbSchema, dbConfig).mapN(TableCheck.apply)
+    (igluResolver, selfDescribingSchema, igluServerUrl, igluServerApiKey, dbSchema, dbConfig).mapN(TableCheck.apply)
   }
 
   val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck)
@@ -174,7 +187,7 @@ object Command {
                         public: Boolean) extends StaticCommand
   case class StaticPull(output: Path,
                         registryRoot: Server.HttpUrl,
-                        apikey: UUID) extends StaticCommand
+                        apikey: Option[UUID]) extends StaticCommand
   case class StaticS3Cp(input: Path,
                         bucket: Bucket,
                         s3Path: Option[S3Path],
@@ -193,11 +206,14 @@ object Command {
                       port: Int,
                       dbname: String,
                       username: String,
-                      password: String,
-                      driver: String,
-                      maxPoolSize: Int)
+                      password: String)
 
-  case class TableCheck(resolver: Path, schema: SchemaKey, dbSchema: String, storageConfig: DbConfig) extends IgluctlCommand
+  case class TableCheck(resolver: Option[Path],
+                        schema: Option[SchemaKey],
+                        igluServerUrl: Option[Server.HttpUrl],
+                        apiKey: Option[UUID],
+                        dbSchema: String,
+                        storageConfig: DbConfig) extends IgluctlCommand
 
   case object VersionFlag extends IgluctlCommand
 
