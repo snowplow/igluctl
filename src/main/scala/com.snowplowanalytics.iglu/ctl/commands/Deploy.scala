@@ -121,7 +121,7 @@ object Deploy {
         force         <- cursor.downField("force").as[Boolean]
         owner         <- cursor.downField("owner").as[String]
       } yield Command.StaticGenerate(
-        tempPath, output, dbSchema, Some(owner),
+        tempPath, Some(output), dbSchema, Some(owner),
         varcharSize, withJsonPaths, false, false, noHeader, force
       )
     }

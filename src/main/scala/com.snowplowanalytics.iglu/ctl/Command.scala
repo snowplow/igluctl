@@ -132,7 +132,7 @@ object Command {
 
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
-    (input, output, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
+    (input, output.orNone, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
   }
   val staticDeploy = Opts.subcommand("deploy", "Master command for schema deployment")(Opts.argument[Path]("config").map(StaticDeploy))
   val staticPush = Opts.subcommand("push", "Upload Schemas from folder onto the Iglu Server") {
@@ -171,7 +171,7 @@ object Command {
 
   sealed trait StaticCommand extends IgluctlCommand
   case class StaticGenerate(input: Path,
-                            output: Path,
+                            output: Option[Path],
                             dbSchema: String,
                             owner: Option[String],
                             varcharSize: Int,
