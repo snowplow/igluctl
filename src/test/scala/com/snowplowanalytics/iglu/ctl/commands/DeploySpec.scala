@@ -69,7 +69,7 @@ class DeploySpec extends Specification { def is = s2"""
         inputPath, true, List(Linter.unknownFormats, Linter.rootObject)
       ),
       Command.StaticGenerate(
-        inputPath, outputPath, "atomic", Some("a_new_owner"), 4096, true,
+        inputPath, Some(outputPath), "atomic", Some("a_new_owner"), 4096, true,
         false, false, false, false
       ),
       List(

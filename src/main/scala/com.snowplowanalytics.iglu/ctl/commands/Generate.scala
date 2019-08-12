@@ -45,7 +45,7 @@ object Generate {
     * and output them to specified path, also output errors
     */
   def process(input: Path,
-              output: Path,
+              optOutput: Option[Path],
               withJsonPaths: Boolean,
               rawMode: Boolean,
               dbSchema: String,
@@ -61,6 +61,8 @@ object Generate {
       else
         transformSnowplow(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner)
 
+    val output = getOutput(optOutput)
+
     for {
       _           <- File.checkOutput(output)
       schemaFiles <- EitherT(File.readSchemas(input).map(_.toEither))
@@ -71,6 +73,13 @@ object Generate {
       messages    <- EitherT(outputResult(output, result, force))
     } yield messages
   }
+
+  /**
+    * Gives path which executable is called if given
+    * path is None
+    */
+  def getOutput(output: Option[Path]): Path =
+    output.getOrElse(Paths.get("").toAbsolutePath)
 
   /**
     * Create Schema objects from list of schema jsons
