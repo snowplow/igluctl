@@ -65,10 +65,7 @@ sealed trait File[A] extends Serializable { self =>
   /** Transform JSON file into a JSON Schema file and validate its content and path */
   def asSchema(implicit ev: A =:= Json): Either[Error, SchemaFile] = {
     val jsonContent: Json = content
-    SelfDescribingSchema.parse(jsonContent).leftMap {
-      case ParseError.InvalidSchema => Error.ParseError(path, s"Cannot extract Self-describing JSON Schema from JSON file")
-      case other =>  Error.ParseError(path, s"JSON Schema in file [${path.toAbsolutePath}] is not valid, ${other.code}")
-    }.ensureOr(schema => Error.PathMismatch(path, schema.self)) {
+    parseSelfDescribingSchema(jsonContent).ensureOr(schema => Error.PathMismatch(path, schema.self)) {
       schema => Utils.equalPath(self.withContent(jsonContent), schema.self)
     }.map(schema => self.withContent(schema))
   }
@@ -100,6 +97,19 @@ sealed trait File[A] extends Serializable { self =>
       case f: File[_] => f.path == self.path && f.content == self.content
       case _ => false
     }
+
+  private def parseSelfDescribingSchema(schemaJson: Json): Either[Error.ParseError, SelfDescribingSchema[Json]] =
+    schemaJson.hcursor.downField("$schema").as[String].leftMap(e => Error.ParseError(path, "Cannot parse '$schema' field to string")).flatMap( schemaFieldVal => {
+      val expectedSchemaFieldVal = "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#"
+      if (!schemaFieldVal.equals(expectedSchemaFieldVal)) {
+        Error.ParseError(path, s"'$$schema' field is not equal to '$expectedSchemaFieldVal'").asLeft
+      } else {
+        SelfDescribingSchema.parse(schemaJson).leftMap {
+          case ParseError.InvalidSchema => Error.ParseError(path, s"Cannot extract Self-describing JSON Schema from JSON file")
+          case other => Error.ParseError(path, s"JSON Schema in file [${path.toAbsolutePath}] is not valid, ${other.code}")
+        }
+      }
+    })
 }
 
 /** Module for manipulating file system and constructing instances of [[File]] */

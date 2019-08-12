@@ -40,6 +40,7 @@ class FileSpec extends Specification { def is = s2"""
     extractResultFromJsonSchemas returns both 'gap' error and given schemas  $e7
     extractResultFromJsonSchemas returns both given errors and schemas $e8
     extractResultFromJsonSchemas returns only given schemas when there is no error in given list $e9
+    extractSelfDescribingSchema fails to extract SchemaMap from JSON file with JSON Schema if $$schema field is not equal to expected one $e10
   """
 
   def e1 = {
@@ -300,6 +301,27 @@ class FileSpec extends Specification { def is = s2"""
     )
 
     File.extractResultFromJsonSchemas(jsonSchemas, mainFolderPath) must beEqualTo(expected)
+  }
+
+  def e10 = {
+    val schema = json"""
+         {
+         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self/schema/jsonschema/1-0-0#",
+         	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
+         	"self": {
+         		"vendor": "com.acme",
+         		"name": "example",
+         		"format": "jsonschema",
+         		"version": "1-0-0"
+         	},
+         	"properties": {
+         		"name": {}
+         	}
+         }"""
+    val schemaFile = File.jsonFile(Paths.get("/additional/path/com.acme/example/jsonschema/1-0-0"), schema)
+
+    val expected = Error.ParseError(Paths.get("/additional/path/com.acme/example/jsonschema/1-0-0"), "'$schema' field is not equal to 'http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#'")
+    schemaFile.asSchema must beLeft(expected)
   }
 
 }

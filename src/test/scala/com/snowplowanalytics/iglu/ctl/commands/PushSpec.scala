@@ -39,6 +39,7 @@ class PushSpec extends Specification { def is = s2"""
     // valid
     val schema1 = json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self": {
             "vendor": "com.acme",
             "name": "event",
@@ -54,6 +55,7 @@ class PushSpec extends Specification { def is = s2"""
     // invalid SchemaVer
     val schema2 =  json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self": {
             "vendor": "com.acme",
             "name": "event",
@@ -67,6 +69,7 @@ class PushSpec extends Specification { def is = s2"""
     // not self-describing
     val schema3 = json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "type": "object"
         }"""
     val jsonFile3 = jsonFile(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), schema3)
@@ -74,6 +77,7 @@ class PushSpec extends Specification { def is = s2"""
     // not full path
     val schema4 = json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self": {
             "vendor": "com.acme",
             "name": "event",
