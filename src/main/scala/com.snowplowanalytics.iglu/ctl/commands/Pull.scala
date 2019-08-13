@@ -48,29 +48,14 @@ object Pull {
     */
   def process(outputDir: Path,
               registryRoot: Server.HttpUrl,
-              masterApiKey: Option[UUID]): IgluctlResult = {
+              readApiKey: Option[UUID]): IgluctlResult = {
     val stream = for {
-      keys <- getKeys(registryRoot, masterApiKey)
-      schemas <- Stream.eval(getSchemas(Server.buildPullRequest(registryRoot, keys)))
+      schemas <- Stream.eval(getSchemas(Server.buildPullRequest(registryRoot, readApiKey)))
       schema <- Stream.emits[Failing, SelfDescribingSchema[Json]](schemas)
       writeRes <- Stream.eval(writeSchema(schema, outputDir))
     } yield writeRes
 
     stream.compile.toList.leftMap(e => NonEmptyList.of(e))
-  }
-
-  /**
-    * Get read/write keys with masterApiKey. If given masterApiKey is None,
-    * emit None directly in that case.
-    * @param registryRoot URL of Iglu Server which apikeys will be created for
-    * @param masterApiKey master apikey of the given Iglu Server
-    * @return None if given masterApiKey is None, newly created read/write apikeys otherwise
-    */
-  def getKeys(registryRoot: Server.HttpUrl, masterApiKey: Option[UUID]): Stream[Failing, Option[Server.ApiKeys]] = {
-    masterApiKey match {
-      case None => Stream.emit(None)
-      case Some(key) =>  Stream.resource(Server.temporaryKeys(registryRoot, key)).map(e => Some(e))
-    }
   }
 
   /**

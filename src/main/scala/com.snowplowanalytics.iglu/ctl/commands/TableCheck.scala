@@ -169,10 +169,9 @@ object TableCheck {
     * corresponding tables of all the schemas is matching or not
     * Returns result stream of table check processes in the end
     */
-  def tableCheckMultiple(registryRoot: Server.HttpUrl, masterApiKey: Option[UUID], storage: Storage[IO], dbschema: String): Stream[Failing, TableCheckResult] =
+  def tableCheckMultiple(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], storage: Storage[IO], dbschema: String): Stream[Failing, TableCheckResult] =
     for {
-      keys        <- Pull.getKeys(registryRoot, masterApiKey)
-      schemaJsons <- Stream.eval(Pull.getSchemas(Server.buildPullRequest(registryRoot, keys)))
+      schemaJsons <- Stream.eval(Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey)))
       schemas     <- Stream.eval(EitherT.fromEither[IO](Generate.parseSchemaJsonsToSchemas(schemaJsons)))
       modelGroupMap = createModelGroups(schemas)
       temp        <- Stream.emits[Failing, (SchemaKey, List[IgluSchema])](modelGroupMap.toList)

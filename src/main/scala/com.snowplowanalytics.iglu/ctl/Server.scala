@@ -157,15 +157,15 @@ object Server {
     * read key
     *
     * @param registryRoot Iglu server URI
-    * @param apiKeys optional apikey. If it is None, request will be made without
+    * @param optReadApiKey optional apikey. If it is None, request will be made without
     *                apikey and therefore only public schemas will be read
     * @return HTTP GET request ready to be sent
     */
-  def buildPullRequest(registryRoot: HttpUrl, apiKeys: Option[ApiKeys]): HttpRequest = {
+  def buildPullRequest(registryRoot: HttpUrl, optReadApiKey: Option[UUID]): HttpRequest = {
     val httpRequest = Http(s"${registryRoot.uri}/api/schemas?repr=canonical").header("accept", "application/json")
-    apiKeys match {
+    optReadApiKey match {
       case None => httpRequest
-      case Some(ApiKeys(readKey, _)) => httpRequest.header("apikey", readKey)
+      case Some(readApiKey) => httpRequest.header("apikey", readApiKey.toString)
     }
   }
 
