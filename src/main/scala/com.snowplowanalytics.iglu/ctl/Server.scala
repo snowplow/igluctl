@@ -78,7 +78,10 @@ object Server {
   }
 
   def createKeys(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix): Failing[ApiKeys] =
-    getApiKeys(buildCreateKeysRequest(registryRoot, masterApiKey, prefix, true))
+    for {
+      isOldServer <- checkOldServer(registryRoot)
+      apiKeys <- getApiKeys(buildCreateKeysRequest(registryRoot, masterApiKey, prefix, isOldServer))
+    } yield apiKeys
 
   /** Create transitive pair of keys that will be deleted right after job completed */
   def temporaryKeys(registryRoot: HttpUrl, masterApiKey: UUID): Resource[Failing, ApiKeys] =
@@ -183,6 +186,11 @@ object Server {
       json      <- EitherT.fromEither[IO](parse(response.body)).leftMap(Error.fromServer)
       extracted <- EitherT.fromEither[IO](json.as[ApiKeys]).leftMap(Error.fromServer)
     } yield extracted
+
+  def checkOldServer(registryRoot: HttpUrl): Failing[Boolean] = {
+    val healthRequest = Http(s"${registryRoot.uri}/api/meta/health")
+    EitherT.liftF(IO(healthRequest.asString)).map(response => !response.body.contains("OK"))
+  }
 
   private val VendorRegex = "[a-zA-Z0-9-_.]+"
 }
