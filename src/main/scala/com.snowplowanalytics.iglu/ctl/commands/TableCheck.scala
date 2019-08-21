@@ -24,15 +24,21 @@ import cats.Show
 import fs2.Stream
 
 import io.circe.syntax._
+import io.circe._
 
 import com.snowplowanalytics.iglu.client.resolver.Resolver
 import com.snowplowanalytics.iglu.client.ClientError
 
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SchemaVer}
+import com.snowplowanalytics.iglu.core.circe.implicits._
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SelfDescribingSchema}
 
 import com.snowplowanalytics.iglu.schemaddl.{IgluSchema, StringUtils => SchemaDDLStringUtils}
-import com.snowplowanalytics.iglu.schemaddl.migrations.Migration
-import com.snowplowanalytics.iglu.schemaddl.redshift.{CreateTable, Column => DDLColumn}
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
+import com.snowplowanalytics.iglu.schemaddl.migrations.SchemaList
+import com.snowplowanalytics.iglu.schemaddl.migrations.SchemaList._
+import com.snowplowanalytics.iglu.schemaddl.migrations.FlatSchema
+import com.snowplowanalytics.iglu.schemaddl.redshift.{Column => DDLColumn}
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.DdlGenerator
 
 import com.snowplowanalytics.iglu.ctl.{File, Server}
@@ -41,7 +47,6 @@ import com.snowplowanalytics.iglu.ctl.Storage.Column
 import com.snowplowanalytics.iglu.ctl.{Common, Result, Storage}
 import com.snowplowanalytics.iglu.ctl.Command
 import com.snowplowanalytics.iglu.ctl.Failing
-import com.snowplowanalytics.iglu.ctl.Utils.modelGroup
 import com.snowplowanalytics.iglu.ctl.commands.TableCheck.TableCheckResult._
 
 
@@ -171,12 +176,12 @@ object TableCheck {
     * Expected table definition is created using model group schemas of given schemaKey
     * Returns whether corresponding table is matched or not in the end
     */
-  def checkTable(storage: Storage[IO], schemaKeyOfLastVersion: SchemaKey, modelGroupSchemas: List[IgluSchema], dbSchema: String): Failing[TableCheckResult] = {
+  def checkTable(storage: Storage[IO], schemaKeyOfLastVersion: SchemaKey, modelGroupSchemas: SchemaList, dbSchema: String): Failing[TableCheckResult] = {
     val res = for {
       existingColumns <- storage.getColumns(SchemaDDLStringUtils.getTableName(SchemaMap(schemaKeyOfLastVersion)), dbSchema)
       expectedColumns = buildTableDdl(modelGroupSchemas)
-    } yield expectedColumns.map(checkColumns(schemaKeyOfLastVersion, existingColumns, _))
-    EitherT(res)
+    } yield checkColumns(schemaKeyOfLastVersion, existingColumns, expectedColumns)
+    EitherT(res.map(_.asRight[Common.Error]))
   }
 
   /**
@@ -198,47 +203,73 @@ object TableCheck {
     */
   def tableCheckMultiple(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], storage: Storage[IO], dbschema: String): Stream[Failing, TableCheckResult] =
     for {
-      schemaJsons <- Stream.eval(Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey)))
-      schemas     <- Stream.eval(EitherT.fromEither[IO](Generate.parseSchemaJsonsToSchemas(schemaJsons)))
-      modelGroupMap = createModelGroups(schemas)
-      temp        <- Stream.emits[Failing, (SchemaKey, List[IgluSchema])](modelGroupMap.toList)
-      (schemaKey, schemaModelGroup) = temp
-      res         <- Stream.eval(checkTable(storage, schemaKey, schemaModelGroup, dbschema))
+      schemas <- Stream.eval(getSchemas(registryRoot, readApiKey))
+      schema <- Stream.emits[Failing, (SchemaKey, SchemaList)](schemas)
+      (schemaKey, modelGroup) = schema
+      res         <- Stream.eval(checkTable(storage, schemaKey, modelGroup, dbschema))
     } yield res
+
+  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID]): Failing[List[(SchemaKey, SchemaList)]] = {
+    for {
+      schemas <- SchemaList.buildMultipleFromFetchedSchemas[IO, Common.Error](
+        {
+          for {
+            schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey))
+            schemas     <- EitherT.fromEither[IO](Generate.parseSchemaJsonsToSchemas(schemaJsons))
+            res <- EitherT.fromEither[IO](
+              NonEmptyList.fromList(schemas) match {
+                case None => (Common.Error.Message("No schema in the registry"): Common.Error).asLeft
+                case Some(nel) => nel.asRight
+              }
+            )
+          } yield res
+        }
+      )
+    } yield schemas.toList.map { e =>
+        val schemaKey = e match {
+          case s: SingleSchema => s.schema.self.schemaKey
+          case s: SchemaListFull => s.schemas.last.self.schemaKey
+        }
+        (schemaKey, e)
+      }
+  }
 
   /**
     * Fetches model group schemas of given schemaKey with resolver which is created
     * from given resolver config
     */
-  def fetchSchemaModelGroup(resolverPath: Path, schemaKey: SchemaKey)(implicit t: Timer[IO]): Failing[List[IgluSchema]] =
+  def fetchSchemaModelGroup(resolverPath: Path, schemaKey: SchemaKey)(implicit t: Timer[IO]): Failing[SchemaList] =
     for {
-      resolverJson <- EitherT(File.readFile(resolverPath).map(_.flatMap(_.asJson)))
-      resolver     <- EitherT(Resolver.parse[IO](resolverJson.content))
+      resolverJson  <- EitherT(File.readFile(resolverPath).map(_.flatMap(_.asJson)))
+      resolver      <- EitherT(Resolver.parse[IO](resolverJson.content))
         .leftMap(e => Error.ConfigParseError(s"Resolver can not created: $e"))
-      schemaJsons  <- resolver.fetchSchemas(schemaKey.vendor, schemaKey.name, Some(schemaKey.version.model))
-        .leftMap(e => Error.ServiceError(s"Error while lookup for schema: ${(e: ClientError).asJson.noSpaces}"))
-        .map(_.filter(s => Ordering[SchemaVer].gteq(schemaKey.version, s.self.schemaKey.version)))
-      schemas      <- EitherT.fromEither[IO](Generate.parseSchemaJsonsToSchemas(schemaJsons))
+      schemaKeyList <- EitherT(resolver.listSchemas(schemaKey.vendor, schemaKey.name, Some(schemaKey.version.model)))
+        .leftMap(e => Error.ServiceError(s"Error while lookup for schema key list: ${(e: ClientError).asJson.noSpaces}"))
+      schemas       <- SchemaList.fromSchemaList(schemaKeyList, { schemaKey =>
+          for {
+            schemaJson  <- EitherT(resolver.lookupSchema(schemaKey))
+              .leftMap(e => Error.ServiceError(s"Error while lookup for schema: ${(e: ClientError).asJson.noSpaces}"))
+            schema      <- EitherT.fromEither[IO](parseSchema(schemaJson))
+          } yield schema
+        })
     } yield schemas
+
+  def parseSchema(schema: Json): Either[Common.Error, IgluSchema] =
+    SelfDescribingSchema.parse(schema)
+      .leftMap(e => Common.Error.Message(s"Error while parsing schema jsons to Schema object, $e"))
+      .flatMap { s =>
+        Schema.parse(s.schema)
+          .map(e => SelfDescribingSchema(s.self, e))
+          .toRight(Common.Error.Message(s"Error while parsing schema jsons to Schema object"))
+      }
 
   /**
     * Creates table structure with given schemas
     */
-  def buildTableDdl(schemas: List[IgluSchema]): Either[Common.Error, List[DDLColumn]] =
-    NonEmptyList.fromList(schemas) match {
-      case None => List.empty[DDLColumn].asRight
-      case Some(nonEmptySchemas) =>
-        val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(nonEmptySchemas)
-        val res = orderedSubSchemaMap.toList match {
-          case (_, orderedSubSchemas)::Nil =>
-            DdlGenerator.generateTableDdl(orderedSubSchemas, "", None, 4096, false).asRight[Common.Error]
-          case Nil =>
-            Error.Message("There is no ordered subschemas to generate table ddl").asLeft[CreateTable]
-          case l =>
-            Error.Message(s"There must be only one ordered subschemas to generate table ddl but there are multiple: ${l.map(_._1)}").asLeft[CreateTable]
-        }
-        res.map(_.columns)
-    }
+  def buildTableDdl(schemas: SchemaList): List[DDLColumn] = {
+    val orderedSubSchemas = FlatSchema.buildOrderedSubSchemas(schemas)
+    DdlGenerator.generateTableDdl(orderedSubSchemas, "", None, 4096, false).columns
+  }
 
   /**
     * Compares existing and expected columns whether they are same or not.
@@ -255,21 +286,6 @@ object TableCheck {
           case _ => TableUnmatched(schemaKey, existingColumns, expectedColumns)
         }
     }
-
-  /**
-    * Groups given schemas with their model groups
-    * Keys of the map in the end are schemaKeys of last version
-    * schemas of corresponding model group
-    */
-  private def createModelGroups(schemas: List[IgluSchema]): Map[SchemaKey, List[IgluSchema]] = {
-    schemas
-      .groupBy(s => modelGroup(s.self))
-      .map {
-        case (_, modelGroupSchemas) =>
-          val lastVersionSchemaKey = modelGroupSchemas.maxBy(_.self.schemaKey.version).self.schemaKey
-          (lastVersionSchemaKey, modelGroupSchemas)
-      }
-  }
 
   private def aggregateResults(results: List[TableCheckResult]): AggregatedTableCheckResults =
     results.foldLeft(AggregatedTableCheckResults()) {

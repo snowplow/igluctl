@@ -17,21 +17,20 @@ import java.nio.file.{Path, Paths}
 import java.time.format.DateTimeFormatter
 import java.time.{ZoneOffset, ZonedDateTime}
 
-import cats.data.{EitherNel, EitherT, NonEmptyList}
+import cats.data._
 import cats.effect.IO
 import cats.implicits._
 import cats.Traverse
-
 import io.circe._
-
-import com.snowplowanalytics.iglu.core.{SchemaMap, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.schemaddl._
-import com.snowplowanalytics.iglu.schemaddl.migrations.{Migration,FlatSchema}
+import com.snowplowanalytics.iglu.schemaddl.migrations.{Migration, SchemaList}
+import com.snowplowanalytics.iglu.schemaddl.migrations.SchemaList._
+import com.snowplowanalytics.iglu.schemaddl.migrations.SchemaList.FullListCreationError._
 import com.snowplowanalytics.iglu.schemaddl.redshift._
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.{DdlFile, DdlGenerator, JsonPathGenerator}
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
-
 import com.snowplowanalytics.iglu.ctl.File.textFile
 import com.snowplowanalytics.iglu.ctl.Utils.modelGroup
 import com.snowplowanalytics.iglu.ctl.Common.Error
@@ -55,12 +54,6 @@ object Generate {
               force: Boolean,
               owner: Option[String]): Result = {
 
-    val produce: NonEmptyList[IgluSchema] => DdlOutput =
-      if (rawMode)
-        transformVanilla(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner)
-      else
-        transformSnowplow(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner)
-
     val output = getOutput(optOutput)
 
     for {
@@ -69,7 +62,7 @@ object Generate {
       schemas     <- EitherT.fromEither[IO](
         parseSchemaJsonsToSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       )
-      result      = produce(schemas)
+      result      = transform(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner, rawMode)(schemas)
       messages    <- EitherT(outputResult(output, result, force))
     } yield messages
   }
@@ -211,22 +204,63 @@ object Generate {
     * Transform list of self-describing JSON Schemas to a single [[DdlOutput]] containing
     * all data to produce: DDL files, JSONPath files, migrations, etc
     */
-  private[ctl] def transformSnowplow(withJsonPaths: Boolean,
-                                     dbSchema: String,
-                                     varcharSize: Int,
-                                     splitProduct: Boolean,
-                                     noHeader: Boolean,
-                                     owner: Option[String])
-                                    (schemas: NonEmptyList[IgluSchema]): DdlOutput = {
-    val migrationMap = Migration.buildMigrationMap(schemas).right.getOrElse(Map.empty)
-    val migrations = Migrations.reifyMigrationMap(migrationMap, Some(dbSchema), varcharSize)
+  private[ctl] def transform(withJsonPaths: Boolean,
+                             dbSchema: String,
+                             varcharSize: Int,
+                             splitProduct: Boolean,
+                             noHeader: Boolean,
+                             owner: Option[String],
+                             rawMode: Boolean)
+                            (schemas: NonEmptyList[IgluSchema]): DdlOutput = {
+    val res = createSchemaListFulls(schemas).leftMap(_.map(parseFullListCreationError)).map { schemaLists =>
+      val migrationMap = NonEmptyList.fromList(schemaLists.collect { case s: SchemaListFull => s }) match {
+        case None => Map.empty[SchemaMap, NonEmptyList[Migration]]
+        case Some(nel) => Migration.buildMigrationMap(nel)
+      }
+      val migrations = Migrations.reifyMigrationMap(migrationMap, Some(dbSchema), varcharSize)
 
-    val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(schemas)
-    val ddlFiles = orderedSubSchemaMap.map {
-      case (schemaMap, subschemas) => produceTable(schemaMap, dbSchema, owner, varcharSize, false, noHeader)(subschemas)
-    }.toList
+      val orderedSubSchemaMap = Migration.buildOrderedSubSchemasMap(schemaLists)
+      val ddlFiles = orderedSubSchemaMap.map {
+        case (schemaMap, subschemas) => produceTable(schemaMap, dbSchema, owner, varcharSize, rawMode, noHeader)(subschemas)
+      }.toList
 
-    generateOutput(withJsonPaths, false)(migrations, ddlFiles)
+      generateOutput(withJsonPaths, rawMode)(migrations, ddlFiles)
+    }
+    res.fold(
+      { warnings => DdlOutput(Nil, Nil, Nil, warnings.toList) },
+      identity,
+      { case (warnings, ddlOutput) => ddlOutput.copy(warnings = ddlOutput.warnings ++ warnings.toList) }
+    )
+  }
+
+  def createSchemaListFulls(schemas: NonEmptyList[IgluSchema]): Ior[NonEmptyList[FullListCreationError], NonEmptyList[SchemaList]] = {
+    val res = SchemaList.buildMultiple(schemas).leftMap { errNel =>
+      val ambiguousSeparated = errNel.nonEmptyPartition {
+        case e: AmbiguousOrder => e.asRight
+        case e => e.asLeft
+      }
+      val ambiguousBuilds = ambiguousSeparated.right.map { nel =>
+        nel.nonEmptyPartition(e => SchemaList.unsafeBuildWithReorder(e.schemas))
+      }
+      Ior.fromOptions(
+        ambiguousBuilds.flatMap(_.left),
+        ambiguousBuilds.flatMap(_.right)
+      ).map(_.combine(Ior.left(errNel))).getOrElse(Ior.left(errNel))
+    }
+    res match {
+      case Ior.Left(ior) => ior
+      case Ior.Right(nel) => nel.rightIor
+      case Ior.Both(ior, nel) => ior.combine(nel.rightIor)
+    }
+  }
+
+  def parseFullListCreationError(fullListCreationError: FullListCreationError): String = {
+    val extractSchemaKeys: ModelGroupList => NonEmptyList[SchemaKey] = _.schemas.map(_.self.schemaKey)
+    fullListCreationError match {
+      case AmbiguousOrder(m) => s"Ambiguous order in the following schemas, ${extractSchemaKeys(m)}"
+      case GapInModelGroup(m) => s"Gap in the following model group schemas, ${extractSchemaKeys(m)}"
+      case UnexpectedError(m) => s"Unexpected error while creating SchemaFullList, ${extractSchemaKeys(m)}"
+    }
   }
 
   // Header Section for a Redshift DDL File
@@ -238,28 +272,6 @@ object Generate {
 
   // Header section with additional space
   def header(omit: Boolean) = if (omit) Nil else List(redshiftDdlHeader, Empty)
-
-
-  // Raw
-
-  /**
-    * Transform list of self-describing JSON Schemas
-    * to raw DDL output, without extra Snowplow columns
-    */
-  private[ctl] def transformVanilla(withJsonPaths: Boolean,
-                                    dbSchema: String,
-                                    varcharSize: Int,
-                                    splitProduct: Boolean,
-                                    noHeader: Boolean,
-                                    owner: Option[String])
-                                   (files: NonEmptyList[IgluSchema]): DdlOutput = {
-    val ddlFiles = files.toList
-      .map { schema =>
-        val orderedSubSchemas = FlatSchema.order(FlatSchema.build(schema.schema).subschemas)
-        produceTable(schema.self, dbSchema, owner, varcharSize, true, noHeader)(orderedSubSchemas)
-      }
-    generateOutput(withJsonPaths, true)(Nil, ddlFiles)
-  }
 
   // Common
 
