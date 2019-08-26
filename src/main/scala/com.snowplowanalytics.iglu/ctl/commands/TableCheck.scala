@@ -107,7 +107,7 @@ object TableCheck {
               dbschema: String,
               storageConfig: Command.DbConfig)(implicit cs: ContextShift[IO], t: Timer[IO]): FinalResult = {
     val stream = for {
-      resolvedDbConfig <- Stream.eval(resolveDbConfig(storageConfig))
+      resolvedDbConfig <- Stream.eval(Storage.resolveDbConfig(storageConfig))
       storage <- Stream.resource(Storage.initialize[IO](resolvedDbConfig)).translate[IO, Failing](Common.liftIO)
       res     <- tableCheckType match {
         case Command.SingleTableCheck(resolver, schema) =>
@@ -121,38 +121,6 @@ object TableCheck {
       .leftMap(e => NonEmptyList.of(e))
       .map(l => List(aggregateResults(l).show))
   }
-
-  /**
-    * Try to fetch missing db config fields from environment variables
-    */
-  def resolveDbConfig(commandDbConfig: Command.DbConfig): Failing[Storage.DbConfig] = {
-    val res = for {
-      host     <- resolveOptArgument("PGHOST", commandDbConfig.host)
-      dbName   <- resolveOptArgument("PGDATABASE", commandDbConfig.dbname)
-      username <- resolveOptArgument("PGUSER", commandDbConfig.username)
-      password <- resolveOptArgument("PGPASSWORD", commandDbConfig.password)
-    } yield (host, commandDbConfig.port.validNel, dbName, username, password).mapN(Storage.DbConfig.apply)
-    EitherT(
-      res.map { validated =>
-        validated.toEither.leftMap { errors =>
-          Common.Error.Message(errors.mkString_("\n"))
-        }
-      }
-    )
-  }
-
-  /**
-    * In case of given optional argument is None, try to fetch given
-    * environment variable. If env variable exists, return it. Otherwise,
-    * return error.
-    */
-  def resolveOptArgument(envVariable: String, optionalArg: Option[String]): IO[ValidatedNel[String, String]] =
-    IO.delay {
-      optionalArg match {
-        case None => sys.env.get(envVariable).toValidNel[String](s"$envVariable is not set")
-        case Some(arg) => arg.validNel[String]
-      }
-    }
 
   /**
     * Checks corresponding table of given schemaKey against expected table definition

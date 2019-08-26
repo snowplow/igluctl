@@ -17,6 +17,8 @@ import java.util.concurrent.{ExecutorService, Executors}
 import scala.concurrent.ExecutionContext
 
 import cats.effect._
+import cats.data._
+import cats.implicits._
 
 import doobie.implicits._
 import doobie.util.transactor.Transactor
@@ -63,4 +65,36 @@ object Storage {
         xa: Transactor[F] = Transactor.fromDriverManager[F]("org.postgresql.Driver", url, username, password, blockingContext)
       } yield Storage(xa)
   }
+
+  /**
+    * Try to fetch missing db config fields from environment variables
+    */
+  def resolveDbConfig(commandDbConfig: Command.DbConfig): Failing[Storage.DbConfig] = {
+    val res = for {
+      host     <- resolveOptArgument("PGHOST", commandDbConfig.host)
+      dbName   <- resolveOptArgument("PGDATABASE", commandDbConfig.dbname)
+      username <- resolveOptArgument("PGUSER", commandDbConfig.username)
+      password <- resolveOptArgument("PGPASSWORD", commandDbConfig.password)
+    } yield (host, commandDbConfig.port.validNel, dbName, username, password).mapN(Storage.DbConfig.apply)
+    EitherT(
+      res.map { validated =>
+        validated.toEither.leftMap { errors =>
+          Common.Error.Message(errors.mkString_("\n"))
+        }
+      }
+    )
+  }
+
+  /**
+    * In case of given optional argument is None, try to fetch given
+    * environment variable. If env variable exists, return it. Otherwise,
+    * return error.
+    */
+  private def resolveOptArgument(envVariable: String, optionalArg: Option[String]): IO[ValidatedNel[String, String]] =
+    IO.delay {
+      optionalArg match {
+        case None => sys.env.get(envVariable).toValidNel[String](s"$envVariable is not set")
+        case Some(arg) => arg.validNel[String]
+      }
+    }
 }
