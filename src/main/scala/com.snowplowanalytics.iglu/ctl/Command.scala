@@ -84,7 +84,7 @@ object Command {
   val accessKeyId = Opts.option[String]("accessKeyId", "AWS Access Key Id", metavar = "key").orNone
   val secretAccessKey = Opts.option[String]("secretAccessKey", "AWS Secret Access Key", metavar = "key").orNone
   val profile = Opts.option[String]("profile", "AWS Profile name", metavar = "name").orNone
-  val region = Opts.option[String]("region", "AWS Region", metavar = "name").orNone
+  val region = Opts.option[String]("region", "AWS Region", metavar = "name")
 
   // lint options
   val lintersListText =
@@ -120,6 +120,10 @@ object Command {
   val singleTableCheck = (igluResolver, selfDescribingSchema).mapN(SingleTableCheck.apply)
   val multipleTableCheck = (igluServerUrl, igluServerApiKey).mapN(MultipleTableCheck.apply)
 
+  // TableMigrate options
+  val outputS3Path = Opts.option[S3Path]("output", "S3 Path for output")
+  val awsRole = Opts.option[String]("role", "AWS Role")
+
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
     (input, output.orNone, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
@@ -132,7 +136,7 @@ object Command {
     (output, registryRoot, apikey.orNone).mapN(StaticPull.apply)
   }
   val staticS3Cp = Opts.subcommand("s3cp", "Upload Schemas or JSON Path files onto S3") {
-    (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region).mapN(StaticS3Cp.apply)
+    (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region.orNone).mapN(StaticS3Cp.apply)
   }
   val serverKeygen = Opts.subcommand("keygen", "Generate API key on remote Iglu Server") {
     (registryRoot, apikey, vendorPrefix).mapN(ServerKeygen.apply)
@@ -150,7 +154,11 @@ object Command {
     (singleTableCheck.orElse(multipleTableCheck), dbSchema, dbConfig).mapN(TableCheck.apply)
   }
 
-  val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck)
+  val tableMigrate = Opts.subcommand("table-migrate", "Create SQL statements for migrating table of schema") {
+    (singleTableCheck, dbSchema, outputS3Path, awsRole, region, dbConfig).mapN(TableMigrate.apply)
+  }
+
+  val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck.orElse(tableMigrate))
 
   val version = Opts.flag("version", "Display version").as(VersionFlag)
 
@@ -209,6 +217,13 @@ object Command {
   case class TableCheck(tableCheckType: TableCheckType,
                         dbSchema: String,
                         storageConfig: DbConfig) extends IgluctlCommand
+
+  case class TableMigrate(singleTableCheck: SingleTableCheck,
+                          dbSchema: String,
+                          outputS3Path: S3Path,
+                          awsRole: String,
+                          awsRegion: String,
+                          dbConfig: DbConfig) extends IgluctlCommand
 
   case object VersionFlag extends IgluctlCommand
 

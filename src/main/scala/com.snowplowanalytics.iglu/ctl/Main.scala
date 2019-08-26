@@ -70,6 +70,9 @@ object Main extends IOApp {
       case Right(Command.TableCheck(tableCheckType, dbschema, storageConfig)) =>
         TableCheck.process(tableCheckType, dbschema, storageConfig)
 
+      case Right(Command.TableMigrate(tableCheck, dbSchema, outputS3Path, awsRole, awsRegion, dbConfig)) =>
+        TableMigrate.process(tableCheck.resolver, tableCheck.schema, dbSchema, outputS3Path, awsRole, awsRegion, dbConfig)
+
       case Right(Command.VersionFlag) =>
         EitherT.fromEither[IO](List(generated.ProjectSettings.version).asRight)
 
