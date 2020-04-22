@@ -183,8 +183,8 @@ object Server {
   def getApiKeys(request: HttpRequest): Failing[ApiKeys] =
     for {
       response  <- EitherT.liftF(IO(request.asString))
-      json      <- EitherT.fromEither[IO](parse(response.body)).leftMap(Error.fromServer)
-      extracted <- EitherT.fromEither[IO](json.as[ApiKeys]).leftMap(Error.fromServer)
+      json      <- EitherT.fromEither[IO](parse(response.body)).leftMap(Error.fromServer(response))
+      extracted <- EitherT.fromEither[IO](json.as[ApiKeys]).leftMap(Error.fromServer(response))
     } yield extracted
 
   def checkOldServer(registryRoot: HttpUrl): Failing[Boolean] = {
