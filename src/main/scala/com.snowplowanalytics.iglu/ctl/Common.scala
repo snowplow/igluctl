@@ -23,6 +23,8 @@ import cats.effect.IO
 import cats.implicits._
 import cats.Order
 
+import scalaj.http.HttpResponse
+
 import io.circe.{ Error => CirceError, ParsingFailure, DecodingFailure }
 
 import fs2.Stream
@@ -86,13 +88,21 @@ object Common {
       case Error.WriteError(path, reason) => s"Cannot write [$path]: $reason"
     }
 
-    def fromServer(error: CirceError): Error =
+    def fromServer(response: HttpResponse[String])(error: CirceError): Error = {
+      val headersCompact = response.headers.map {
+        case (k, v) => v.toList match {
+          case h :: Nil => show"$k=$h"
+          case vs => show"$k=${vs.mkString(",")}"
+        }
+      }
+      val res = show"HTTP Status: ${response.code}; Headers: ${headersCompact.mkString(",")} Body: ${response.body}"
       error match {
         case _: ParsingFailure =>
-          ServiceError("Cannot parse Server response, not JSON. " ++ error.show)
+          ServiceError(show"Cannot parse Server response, not a JSON. $res. Error: $error")
         case _: DecodingFailure =>
-          ServiceError("Unexpected JSON request from Server. " ++ error.show)
+          ServiceError(show"Unexpected JSON response from Server:  $res. Error: $error")
       }
+    }
   }
 
 
