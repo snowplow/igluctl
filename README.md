@@ -16,7 +16,7 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 You can download igluctl archive from our Bintray, using following link:
 
 ```
-http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.0.zip
+http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.1.zip
 ```
 
 Before running it - make sure you have [Oracle JRE 8][jre] installed.
@@ -38,7 +38,7 @@ Below and everywhere in documentation you'll find example commands without `java
 You can extract and run archive using following commands:
 
 ```bash
-$ unzip -j igluctl_0.7.0.zip
+$ unzip -j igluctl_0.7.1.zip
 $ ./igluctl lint $SCHEMAS_DIR
 ```
 
