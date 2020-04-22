@@ -1,3 +1,7 @@
+Version 0.7.1 (2020-04-22)
+--------------------------
+Provide server response in static push errors (#54)
+
 Version 0.7.0 (2019-02-06)
 --------------------------
 Add rdbms table-migrate command (#51)
