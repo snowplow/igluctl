@@ -75,6 +75,7 @@ object Command {
   val registryRoot = Opts.argument[Server.HttpUrl]("uri")
   val apikey = Opts.argument[UUID]("uuid")
   val public = Opts.flag("public", "Upload schemas as public").orFalse
+  val legacy = Opts.flag("legacy", "Upload schemas with master API key (for pre-0.6.0 Server)").orFalse
 
   // static s3cp options
   type S3Path = String
@@ -130,7 +131,7 @@ object Command {
   }
   val staticDeploy = Opts.subcommand("deploy", "Master command for schema deployment")(Opts.argument[Path]("config").map(StaticDeploy))
   val staticPush = Opts.subcommand("push", "Upload Schemas from folder onto the Iglu Server") {
-    (input, registryRoot, apikey, public).mapN(StaticPush.apply)
+    (input, registryRoot, apikey, public, legacy).mapN(StaticPush.apply)
   }
   val staticPull = Opts.subcommand("pull", "Download schemas from Iglu Server to local folder") {
     (output, registryRoot, apikey.orNone).mapN(StaticPull.apply)
@@ -182,7 +183,8 @@ object Command {
   case class StaticPush(input: Path,
                         registryRoot: Server.HttpUrl,
                         apikey: UUID,
-                        public: Boolean) extends StaticCommand
+                        public: Boolean,
+                        legacy: Boolean) extends StaticCommand
   case class StaticPull(output: Path,
                         registryRoot: Server.HttpUrl,
                         apikey: Option[UUID]) extends StaticCommand

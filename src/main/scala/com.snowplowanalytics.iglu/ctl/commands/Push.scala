@@ -36,17 +36,26 @@ import com.snowplowanalytics.iglu.ctl.{ Result => IgluctlResult }
  */
 object Push {
 
-  /** Primary function, performing IO reading, processing and printing results */
+  /**
+    * Primary function, performing IO reading, processing and printing results
+    * @param inputDir path to schemas to upload
+    * @param registryRoot Iglu Server endpoint (without `/api`)
+    * @param apiKey API key with write permissions (master key if `legacy` is true)
+    * @param isPublic whether schemas should be publicly available
+    * @param legacy whether it should be compatible with pre-0.6.0 Server,
+    *               which required to create temporary keys first
+    */
   def process(inputDir: Path,
               registryRoot: Server.HttpUrl,
-              masterApiKey: UUID,
-              isPublic: Boolean): IgluctlResult = {
+              apiKey: UUID,
+              isPublic: Boolean,
+              legacy: Boolean): IgluctlResult = {
     val stream = for {
-      keys   <- Stream.resource(Server.temporaryKeys(registryRoot, masterApiKey))
+      key    <- if (legacy) Stream.resource(Server.temporaryKeys(registryRoot, apiKey)).map(_.write) else Stream.emit(apiKey)
       file   <- streamFiles(inputDir, Some(filterJsonSchemas)).translate[IO, Failing](Common.liftIO).map(_.flatMap(_.asJsonSchema))
       result <- file match {
         case Right(schema) =>
-          val request = Server.buildPushRequest(registryRoot, isPublic, schema.content, keys.write)
+          val request = Server.buildPushRequest(registryRoot, isPublic, schema.content, key)
           Stream.eval[Failing, Result](postSchema(request))
         case Left(error) =>
           Stream.eval(EitherT.leftT[IO, Result](error))
@@ -96,13 +105,6 @@ object Push {
         println(s"FAILURE: ${s.asString}")
         copy(unknown = unknown + 1)
     }
-
-    /**
-      * Perform cleaning
-      *
-      * @param f cleaning function
-      */
-    def clean(f: () => Unit): Unit = f()
   }
 
   object Total {

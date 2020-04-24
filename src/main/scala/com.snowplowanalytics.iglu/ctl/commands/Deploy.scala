@@ -146,7 +146,7 @@ object Deploy {
             secret       <- cursor.downField("apikey").as[ApiKeySecret]
             masterApiKey <- secret.value.leftMap(e => DecodingFailure(e.toString, cursor.history))
             isPublic     <- cursor.downField("isPublic").as[Boolean]
-          } yield IgluctlAction.Push(Command.StaticPush(tempPath, registryRoot, masterApiKey, isPublic))
+          } yield IgluctlAction.Push(Command.StaticPush(tempPath, registryRoot, masterApiKey, isPublic, false))
         case Right(unknown) =>
           DecodingFailure(s"Unknown IgluCtl action: $unknown", cursor.history).asLeft
         case Left(e) =>

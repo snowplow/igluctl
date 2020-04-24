@@ -76,7 +76,8 @@ class DeploySpec extends Specification { def is = s2"""
         IgluctlAction.Push(Command.StaticPush(
           inputPath, Server.HttpUrl(URI.create("http://iglu-server.com")),
           UUID.fromString("79f28002-aadc-4bdf-bd79-7209f28873b9"),
-          true
+          true,
+          false
         )),
         IgluctlAction.S3Cp(Command.StaticS3Cp(
           inputPath, "bucket", Some("path_1/path_2"),

@@ -42,9 +42,9 @@ object Server {
     * server response using `getApiKey`
     *
     * @param read stringified UUID for read apikey (not used anywhere)
-    * @param write stringified UUID for write apikey (not used anywhere)
+    * @param write stringified UUID for write apikey
     */
-  case class ApiKeys(read: String, write: String)
+  case class ApiKeys(read: UUID, write: UUID)
 
   implicit val circeApiKeysDecoder: Decoder[ApiKeys] =
     deriveDecoder[ApiKeys]
@@ -97,10 +97,10 @@ object Server {
     * @param key UUID of temporary key
     * @param purpose what exact key being deleted, used to log, can be empty
     */
-  def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: String, purpose: String): IO[Unit] = {
+  def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: UUID, purpose: String): IO[Unit] = {
     val request = Http(s"$registryRoot/api/auth/keygen")
       .header("apikey", masterApiKey.toString)
-      .param("key", key)
+      .param("key", key.toString)
       .method("DELETE")
 
     IO(Validated.catchNonFatal(request.asString) match {
@@ -149,9 +149,9 @@ object Server {
     * @param writeKey temporary apikey allowed to write any Schema
     * @return HTTP POST-request ready to be sent
     */
-  def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: String): HttpRequest =
+  def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: UUID): HttpRequest =
     Http(s"${registryRoot.uri}/api/schemas/${schema.self.schemaKey.toPath}")
-      .header("apikey", writeKey)
+      .header("apikey", writeKey.toString)
       .param("isPublic", isPublic.toString)
       .put(schema.asString)
 
@@ -187,6 +187,7 @@ object Server {
       extracted <- EitherT.fromEither[IO](json.as[ApiKeys]).leftMap(Error.fromServer(response))
     } yield extracted
 
+  /** Check if Server is pre-0.6.0 */
   def checkOldServer(registryRoot: HttpUrl): Failing[Boolean] = {
     val healthRequest = Http(s"${registryRoot.uri}/api/meta/health")
     EitherT.liftF(IO(healthRequest.asString)).map(response => !response.body.contains("OK"))

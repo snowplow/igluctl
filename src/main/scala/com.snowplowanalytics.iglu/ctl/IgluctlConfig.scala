@@ -32,7 +32,7 @@ object IgluctlConfig {
 
     case class Push(command: Command.StaticPush) extends IgluctlAction {
       def process: Result =
-        commands.Push.process(command.input, command.registryRoot, command.apikey, command.public)
+        commands.Push.process(command.input, command.registryRoot, command.apikey, command.public, command.legacy)
     }
   }
 }
