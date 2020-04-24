@@ -16,7 +16,7 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 You can download pre-0.7.2 igluctl versions from our Bintray, using following link:
 
 ```
-http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.1.zip
+http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.2.zip
 ```
 
 As of 0.7.2 release, artifacts are attached to GitHub releases.
@@ -40,7 +40,7 @@ Below and everywhere in documentation you'll find example commands without `java
 You can extract and run archive using following commands:
 
 ```bash
-$ unzip -j igluctl_0.7.1.zip
+$ unzip -j igluctl_0.7.2.zip
 $ ./igluctl lint $SCHEMAS_DIR
 ```
 
