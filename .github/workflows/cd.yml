@@ -1,0 +1,28 @@
+name: CD
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  cd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: coursier/cache-action@v5
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 8
+
+      - name: Create release artifact
+        run: sbt clean assembly
+
+      - name: Create GitHub release & Attach artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/scala-2.11/igluctl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

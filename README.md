@@ -1,6 +1,6 @@
 # Igluctl
 
-[![Build Status][travis-image]][travis] [![License][license-image]][license]
+[![License][license-image]][license]
 
 Igluctl is command-line tool, that enables you to perform the most common tasks with **[Iglu][iglu]** schema registries, i.e.:
 
@@ -13,11 +13,13 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 
 ## User Quickstart
 
-You can download igluctl archive from our Bintray, using following link:
+You can download pre-0.7.2 igluctl versions from our Bintray, using following link:
 
 ```
 http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.1.zip
 ```
+
+As of 0.7.2 release, artifacts are attached to GitHub releases.
 
 Before running it - make sure you have [Oracle JRE 8][jre] installed.
 
@@ -100,9 +102,6 @@ limitations under the License.
 
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
 [license]: http://www.apache.org/licenses/LICENSE-2.0
-
-[travis]: https://travis-ci.org/snowplow-incubator/igluctl
-[travis-image]: https://travis-ci.org/snowplow-incubator/igluctl.png?branch=master
 
 [iglu]: https://github.com/snowplow/iglu
 [schema-guru]: https://github.com/snowplow/schema-guru
