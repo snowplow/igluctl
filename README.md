@@ -1,6 +1,8 @@
 # Igluctl
 
-[![Build Status][travis-image]][travis] [![License][license-image]][license]
+![CI][ci]
+![CD][cd]
+[![License][license-image]][license]
 
 Igluctl is command-line tool, that enables you to perform the most common tasks with **[Iglu][iglu]** schema registries, i.e.:
 
@@ -13,19 +15,25 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 
 ## User Quickstart
 
-You can download igluctl archive from our Bintray, using following link:
+Make sure you have [Oracle JRE 8][jre] installed.
+
+As of 0.7.2 release, artifacts are attached to GitHub releases. e.g. 0.7.2 can be downloaded from
+
+```
+https://github.com/snowplow-incubator/igluctl/releases/download/0.7.2/igluctl
+```
+
+You can download pre-0.7.2 igluctl versions from our Bintray, e.g. 0.7.1 can be downloaded from
 
 ```
 http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.1.zip
 ```
 
-Before running it - make sure you have [Oracle JRE 8][jre] installed.
-
 ### Windows
 
-After downloading and unzipping archive you'll find file `igluctl` which is single executable file.
+`igluctl` is a single executable file.
 
-To run it you can use following format (executable file should be in current directory):
+To run it you can use following format:
 
 ```bash
 $ java -jar igluctl lint $SCHEMAS_DIR
@@ -35,10 +43,9 @@ Below and everywhere in documentation you'll find example commands without `java
 
 ### Mac OS X and Linux
 
-You can extract and run archive using following commands:
+You can run igluctl using following commands:
 
 ```bash
-$ unzip -j igluctl_0.7.1.zip
 $ ./igluctl lint $SCHEMAS_DIR
 ```
 
@@ -101,12 +108,12 @@ limitations under the License.
 [license-image]: http://img.shields.io/badge/license-Apache--2-blue.svg?style=flat
 [license]: http://www.apache.org/licenses/LICENSE-2.0
 
-[travis]: https://travis-ci.org/snowplow-incubator/igluctl
-[travis-image]: https://travis-ci.org/snowplow-incubator/igluctl.png?branch=master
-
 [iglu]: https://github.com/snowplow/iglu
 [schema-guru]: https://github.com/snowplow/schema-guru
 [technical-documentation]: https://github.com/snowplow/iglu/wiki/Igluctl
 
 [jre]: http://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.html
 [aws-cli]: http://docs.aws.amazon.com/cli/latest/userguide/cli-chap-getting-started.html#config-settings-and-precedence
+
+[ci]: https://github.com/snowplow-incubator/igluctl/workflows/CI/badge.svg
+[cd]: https://github.com/snowplow-incubator/igluctl/workflows/CD/badge.svg
