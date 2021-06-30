@@ -27,8 +27,8 @@ object Dependencies {
     // Scala
     val circe            = "0.11.0"
     val catsEffect       = "2.5.3"
-    val schemaddl        = "0.10.0"
-    val igluClient       = "0.6.0"
+    val schemaddl        = "0.14.1"
+    val igluClient       = "1.0.2"
     val decline          = "1.4.0"
     val scalajHttp       = "2.4.2"
     val fs2              = "2.5.9"

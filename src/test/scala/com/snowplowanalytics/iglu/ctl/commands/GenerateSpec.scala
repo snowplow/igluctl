@@ -199,6 +199,7 @@ class GenerateSpec extends Specification { def is = s2"""
 
     val input = json"""
         {
+        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
         	"description":"Schema for an AWS Lambda Java context object, http://docs.aws.amazon.com/lambda/latest/dg/java-context-object.html",
         	"self":{
         		"vendor":"com.amazon.aws.lambda",
@@ -296,29 +297,29 @@ class GenerateSpec extends Specification { def is = s2"""
       """|CREATE SCHEMA IF NOT EXISTS snowplow;
          |
          |CREATE TABLE IF NOT EXISTS snowplow.com_amazon_aws_ec2_instance_identity_document_1 (
-         |    "schema_vendor"        VARCHAR(128)  ENCODE ZSTD NOT NULL,
-         |    "schema_name"          VARCHAR(128)  ENCODE ZSTD NOT NULL,
-         |    "schema_format"        VARCHAR(128)  ENCODE ZSTD NOT NULL,
-         |    "schema_version"       VARCHAR(128)  ENCODE ZSTD NOT NULL,
-         |    "root_id"              CHAR(36)      ENCODE RAW  NOT NULL,
-         |    "root_tstamp"          TIMESTAMP     ENCODE ZSTD NOT NULL,
-         |    "ref_root"             VARCHAR(255)  ENCODE ZSTD NOT NULL,
-         |    "ref_tree"             VARCHAR(1500) ENCODE ZSTD NOT NULL,
-         |    "ref_parent"           VARCHAR(255)  ENCODE ZSTD NOT NULL,
-         |    "account_id"           VARCHAR(4096) ENCODE ZSTD,
-         |    "architecture"         VARCHAR(4096) ENCODE ZSTD,
-         |    "availability_zone"    VARCHAR(4096) ENCODE ZSTD,
-         |    "billing_products"     VARCHAR(5000) ENCODE ZSTD,
-         |    "devpay_product_codes" VARCHAR(5000) ENCODE ZSTD,
-         |    "image_id"             CHAR(12)      ENCODE ZSTD,
-         |    "instance_id"          VARCHAR(19)   ENCODE ZSTD,
-         |    "instance_type"        VARCHAR(4096) ENCODE ZSTD,
-         |    "kernel_id"            CHAR(12)      ENCODE ZSTD,
-         |    "pending_time"         TIMESTAMP     ENCODE ZSTD,
-         |    "private_ip"           VARCHAR(15)   ENCODE ZSTD,
-         |    "ramdisk_id"           CHAR(12)      ENCODE ZSTD,
-         |    "region"               VARCHAR(4096) ENCODE ZSTD,
-         |    "version"              VARCHAR(4096) ENCODE ZSTD,
+         |    "schema_vendor"        VARCHAR(128)   ENCODE ZSTD NOT NULL,
+         |    "schema_name"          VARCHAR(128)   ENCODE ZSTD NOT NULL,
+         |    "schema_format"        VARCHAR(128)   ENCODE ZSTD NOT NULL,
+         |    "schema_version"       VARCHAR(128)   ENCODE ZSTD NOT NULL,
+         |    "root_id"              CHAR(36)       ENCODE RAW  NOT NULL,
+         |    "root_tstamp"          TIMESTAMP      ENCODE ZSTD NOT NULL,
+         |    "ref_root"             VARCHAR(255)   ENCODE ZSTD NOT NULL,
+         |    "ref_tree"             VARCHAR(1500)  ENCODE ZSTD NOT NULL,
+         |    "ref_parent"           VARCHAR(255)   ENCODE ZSTD NOT NULL,
+         |    "account_id"           VARCHAR(4096)  ENCODE ZSTD,
+         |    "architecture"         VARCHAR(4096)  ENCODE ZSTD,
+         |    "availability_zone"    VARCHAR(4096)  ENCODE ZSTD,
+         |    "billing_products"     VARCHAR(65535) ENCODE ZSTD,
+         |    "devpay_product_codes" VARCHAR(65535) ENCODE ZSTD,
+         |    "image_id"             CHAR(12)       ENCODE ZSTD,
+         |    "instance_id"          VARCHAR(19)    ENCODE ZSTD,
+         |    "instance_type"        VARCHAR(4096)  ENCODE ZSTD,
+         |    "kernel_id"            CHAR(12)       ENCODE ZSTD,
+         |    "pending_time"         TIMESTAMP      ENCODE ZSTD,
+         |    "private_ip"           VARCHAR(15)    ENCODE ZSTD,
+         |    "ramdisk_id"           CHAR(12)       ENCODE ZSTD,
+         |    "region"               VARCHAR(4096)  ENCODE ZSTD,
+         |    "version"              VARCHAR(4096)  ENCODE ZSTD,
          |    FOREIGN KEY (root_id) REFERENCES snowplow.events(event_id)
          |)
          |DISTSTYLE KEY
@@ -1123,7 +1124,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
         |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
         |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
-        |    "enum_field"          VARCHAR(9)    ENCODE ZSTD,
+        |    "enum_field"          VARCHAR(9)    ENCODE TEXT255,
         |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
         |)
@@ -1185,7 +1186,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
         |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
         |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
-        |    "a_field.enum_field"  VARCHAR(9)    ENCODE ZSTD,
+        |    "a_field.enum_field"  VARCHAR(9)    ENCODE TEXT255,
         |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
         |)
