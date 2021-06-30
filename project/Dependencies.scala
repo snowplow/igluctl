@@ -16,7 +16,6 @@ object Dependencies {
 
   object V {
     // Java
-    val jsonValidator    = "2.2.10"
     val awsJava          = "2.17.13"
     // Scala
     val circe            = "0.14.1"
@@ -34,7 +33,6 @@ object Dependencies {
 
   object Libraries {
     // Java
-    val jsonValidator    = "com.github.java-json-tools" % "json-schema-validator"      % V.jsonValidator
     val awsJava          = "software.amazon.awssdk"     %  "s3"                        % V.awsJava
     // Scala
     val circeParser      = "io.circe"                   %% "circe-jawn"                % V.circe
