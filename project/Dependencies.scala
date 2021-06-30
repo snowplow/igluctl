@@ -31,7 +31,7 @@ object Dependencies {
     val igluClient       = "0.6.0"
     val decline          = "1.4.0"
     val scalajHttp       = "2.4.2"
-    val fs2              = "1.0.2"
+    val fs2              = "2.5.9"
     val doobie           = "0.7.0"
     // Scala (test only)
     val specs2           = "4.0.1"

@@ -274,7 +274,7 @@ object File {
     }
     Stream
       .eval(action)
-      .flatMap(iterator => Stream.fromIterator[IO, Either[Error, Path]](iterator))
+      .flatMap(iterator => Stream.fromIterator[IO](iterator))
       .flatMap {
         case Right(path) =>
           Stream
