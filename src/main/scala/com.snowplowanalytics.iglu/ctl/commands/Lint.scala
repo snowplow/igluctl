@@ -20,6 +20,7 @@ import cats.data.{EitherT, NonEmptyList, Ior, IorNel, EitherNel}
 import cats.data.Validated.{Valid, Invalid}
 
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
+import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.SanityLinter.{ lint, Report => LinterReport }
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.{Linter, Schema}
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
@@ -95,7 +96,7 @@ object Lint {
       case e => Invalid(NonEmptyList.fromListUnsafe(e))
     }
 
-    val lintCheck = Schema.parse(schema.schema).map { schema =>
+    val lintCheck = Schema.parse(schema.normalize).map { schema =>
       lint(schema, linters) match {
         case report if report.isEmpty => ().validNel[String]
         case report => NonEmptyList.fromListUnsafe(prettifyReport(report)).invalid[Unit]

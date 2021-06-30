@@ -212,7 +212,7 @@ object TableCheck {
       resolverJson  <- EitherT(File.readFile(resolverPath).map(_.flatMap(_.asJson)))
       resolver      <- EitherT(Resolver.parse[IO](resolverJson.content))
         .leftMap(e => Error.ConfigParseError(s"Resolver can not created: $e"))
-      schemaKeyList <- EitherT(resolver.listSchemas(schemaKey.vendor, schemaKey.name, Some(schemaKey.version.model)))
+      schemaKeyList <- EitherT(resolver.listSchemas(schemaKey.vendor, schemaKey.name, schemaKey.version.model))
         .leftMap(e => Error.ServiceError(s"Error while lookup for schema key list: ${(e: ClientError).asJson.noSpaces}"))
       schemas       <- SchemaList.fromSchemaList(schemaKeyList, { schemaKey =>
           for {

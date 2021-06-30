@@ -39,6 +39,7 @@ class PushSpec extends Specification { def is = s2"""
     // valid
     val schema1 = json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self": {
             "vendor": "com.acme",
             "name": "event",
@@ -54,6 +55,7 @@ class PushSpec extends Specification { def is = s2"""
     // invalid SchemaVer
     val schema2 =  json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self": {
             "vendor": "com.acme",
             "name": "event",
@@ -74,6 +76,7 @@ class PushSpec extends Specification { def is = s2"""
     // not full path
     val schema4 = json"""
         {
+          "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
           "self": {
             "vendor": "com.acme",
             "name": "event",
@@ -86,7 +89,7 @@ class PushSpec extends Specification { def is = s2"""
 
     val validSchemaExpectation = jsonFile1.asSchema must beRight
     val mismatchedSchemaVerExpectation = jsonFile2.asSchema must beLeft(Error.PathMismatch(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(1,0,1))))
-    val invalidSchemaExpectation = jsonFile3.asSchema must  beLeft(Error.ParseError(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), "Cannot extract Self-describing JSON Schema from JSON file"))
+    val invalidSchemaExpectation = jsonFile3.asSchema must  beLeft(Error.ParseError(Paths.get("/path/to/schemas/com.acme/event/jsonschema/1-0-2"), "JSON Schema in file [/path/to/schemas/com.acme/event/jsonschema/1-0-2] is not valid, INVALID_METASCHEMA"))
     val invalidShortPathExpectation = jsonFile4.asSchema must beLeft(Error.PathMismatch(Paths.get("/event/jsonschema/1-0-2"),SchemaMap("com.acme","event","jsonschema",SchemaVer.Full(1,0,2))))
 
     validSchemaExpectation and mismatchedSchemaVerExpectation and invalidSchemaExpectation and invalidShortPathExpectation

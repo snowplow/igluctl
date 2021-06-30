@@ -84,7 +84,6 @@ class FileSpec extends Specification { def is = s2"""
     val schemaKey = SchemaMap("org.ietf", "http_cookie", "jsonschema", SchemaVer.Full(1,0,0))
     val body = json"""
         {
-        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
         	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
         	"type": "object",
         	"properties": {
@@ -125,7 +124,6 @@ class FileSpec extends Specification { def is = s2"""
     val schemaMap = SchemaMap("com.acme", "example", "jsonschema", SchemaVer.Full(1,0,0))
     val body = json"""
         {
-        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
         	"description": "Schema for a single HTTP cookie, as defined in RFC 6265",
         	"properties": {
         		"name": {}
