@@ -26,7 +26,7 @@ import io.circe._
 
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SelfDescribingSchema}
 
-import com.snowplowanalytics.iglu.schemaddl.{ Properties, IgluSchema, MigrationMap, ModelGroup, StringUtils }
+import com.snowplowanalytics.iglu.schemaddl.{ Properties, IgluSchema, MigrationMap, StringUtils }
 import com.snowplowanalytics.iglu.schemaddl.migrations.{Migration, SchemaList, FlatSchema}
 import com.snowplowanalytics.iglu.schemaddl.redshift._
 import com.snowplowanalytics.iglu.schemaddl.redshift.generators.{DdlFile, DdlGenerator, JsonPathGenerator}
@@ -34,7 +34,6 @@ import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 
 import com.snowplowanalytics.iglu.ctl.File.textFile
-import com.snowplowanalytics.iglu.ctl.Utils.modelGroup
 import com.snowplowanalytics.iglu.ctl.Common.Error
 
 object Generate {
@@ -154,31 +153,6 @@ object Generate {
   /** Log message either to stderr or stdout */
   private def printWarning(warning: String): IO[Unit] =
     IO(System.out.println(warning))
-
-  /**
-   * Aggregate list of Description-Definition pairs into map, so in value will be left
-   * only table definition for latest revision-addition Schema
-   * Use this to be sure vendor_tablename_1 always generated for latest Schema
-   *
-   * @param ddls list of pairs
-   * @return Map with latest table definition for each Schema addition
-   */
-  private def groupWithLast(ddls: List[(SchemaMap, TableDefinition)]) = {
-    val aggregated = ddls.foldLeft(Map.empty[ModelGroup, (SchemaMap, TableDefinition)]) {
-      case (acc, (description, definition)) =>
-        acc.get(modelGroup(description)) match {
-          case Some((desc, _)) if desc.schemaKey.version.revision < description.schemaKey.version.revision =>
-            acc ++ Map((modelGroup(description), (description, definition)))
-          case Some((desc, _)) if desc.schemaKey.version.revision == description.schemaKey.version.revision &&
-            desc.schemaKey.version.addition < description.schemaKey.version.addition =>
-            acc ++ Map((modelGroup(description), (description, definition)))
-          case None =>
-            acc ++ Map((modelGroup(description), (description, definition)))
-          case _ => acc
-        }
-    }
-    aggregated.map { case (_, (desc, defn)) => (desc, defn) }
-  }
 
   /**
    * Helper function used to extract warning from each generated DDL file

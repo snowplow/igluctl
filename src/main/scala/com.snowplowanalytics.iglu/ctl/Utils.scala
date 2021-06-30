@@ -14,9 +14,6 @@ package com.snowplowanalytics.iglu.ctl
 
 import java.nio.file.Path
 
-// cats
-import cats.syntax.either._
-
 // circe
 import io.circe._
 
