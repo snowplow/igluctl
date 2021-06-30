@@ -29,7 +29,7 @@ object Dependencies {
     val catsEffect       = "2.5.3"
     val schemaddl        = "0.10.0"
     val igluClient       = "0.6.0"
-    val decline          = "0.6.0"
+    val decline          = "1.4.0"
     val scalajHttp       = "2.3.0"
     val fs2              = "1.0.2"
     val doobie           = "0.7.0"
