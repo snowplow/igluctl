@@ -19,7 +19,7 @@ object Dependencies {
     val jsonValidator    = "2.2.10"
     val awsJava          = "2.17.13"
     // Scala
-    val circe            = "0.11.0"
+    val circe            = "0.14.1"
     val catsEffect       = "2.5.3"
     val schemaddl        = "0.14.1"
     val igluClient       = "1.0.2"
@@ -35,16 +35,7 @@ object Dependencies {
   object Libraries {
     // Java
     val jsonValidator    = "com.github.java-json-tools" % "json-schema-validator"      % V.jsonValidator
-<<<<<<< HEAD
     val awsJava          = "software.amazon.awssdk"     %  "s3"                        % V.awsJava
-    // JAXB APIs
-    val javaxXmlBind     = "javax.xml.bind"             %  "jaxb-api"                  % V.javaxXmlBind
-    val jaxbCore         = "com.sun.xml.bind"           %  "jaxb-core"                 % V.jaxbCore
-    val jaxbImpl         = "com.sun.xml.bind"           %  "jaxb-impl"                 % V.jaxbImpl
-    val activation       = "javax.activation"           %  "activation"                % V.activation
-=======
-    val awsJava          = "com.amazonaws"              %  "aws-java-sdk-s3"           % V.awsJava
->>>>>>> 237ed3c (Remove javax xml dependencies)
     // Scala
     val circeParser      = "io.circe"                   %% "circe-jawn"                % V.circe
     val catsEffect       = "org.typelevel"              %% "cats-effect"               % V.catsEffect
