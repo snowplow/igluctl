@@ -26,7 +26,6 @@ lazy val root = project.in(file("."))
   .settings(
     libraryDependencies ++= Seq(
       // Java
-      Libraries.jsonValidator,
       Libraries.awsJava,
       // Scala
       Libraries.circeParser,
