@@ -28,7 +28,6 @@ import cats.Show
 import cats.data.{ EitherT, Validated }
 import cats.syntax.either._
 import cats.syntax.show._
-import cats.syntax.apply._
 import cats.effect.{ IO, Resource }
 
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
