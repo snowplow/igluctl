@@ -58,7 +58,7 @@ class PullSpec extends Specification { def is = s2"""
         |  }
         |]""".stripMargin
 
-    val expected = Common.Error.Message("Error while parsing response: InvalidSchema")
+    val expected = Common.Error.Message("Error while parsing response: InvalidMetaschema")
     val response = HttpResponse(responseBodyWithInvalidSchema, 200, Map("header" -> IndexedSeq("header")))
     val res = Pull.parseResponse(response)
 
