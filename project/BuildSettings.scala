@@ -43,8 +43,8 @@ object BuildSettings {
       "-no-link-warnings" // Suppresses problems with Scaladoc @throws links
     ),
     javacOptions := Seq(
-      "-source", "1.8",
-      "-target", "1.8"
+      "-source", "11",
+      "-target", "11"
     ),
     scalacOptions in Test := Seq("-Yrangepos"),
 
@@ -78,6 +78,7 @@ object BuildSettings {
 
     assemblyMergeStrategy in assembly := {
       case PathList("com", "github", "fge", tail@_*) => MergeStrategy.first
+      case x if x.startsWith("scala/annotation/nowarn") => MergeStrategy.first
       case x if x.endsWith("module-info.class") => MergeStrategy.first
       case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
       case x =>
