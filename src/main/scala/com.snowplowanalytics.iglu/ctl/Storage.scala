@@ -12,10 +12,6 @@
  */
 package com.snowplowanalytics.iglu.ctl
 
-import java.util.concurrent.{ExecutorService, Executors}
-
-import scala.concurrent.ExecutionContext
-
 import cats.effect._
 import cats.data._
 import cats.implicits._
@@ -56,14 +52,10 @@ object Storage {
   def initialize[F[_]: Effect: ContextShift](storageConfig: DbConfig): Resource[F, Storage[F]] = storageConfig match {
     case DbConfig(host, port, dbname, username, password) =>
       val url = s"jdbc:postgresql://$host:$port/$dbname?loggerLevel=OFF"
-      for {
-        blockingContext <- {
-          val alloc = Sync[F].delay(Executors.newSingleThreadExecutor())
-          val free  = (es: ExecutorService) => Sync[F].delay(es.shutdown())
-          Resource.make(alloc)(free).map(ExecutionContext.fromExecutor)
-        }
-        xa: Transactor[F] = Transactor.fromDriverManager[F]("org.postgresql.Driver", url, username, password, blockingContext)
-      } yield Storage(xa)
+      Blocker[F].map { blocker =>
+        val xa = Transactor.fromDriverManager[F]("org.postgresql.Driver", url, username, password, blocker)
+        Storage(xa)
+      }
   }
 
   /**
