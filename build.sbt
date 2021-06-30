@@ -28,11 +28,6 @@ lazy val root = project.in(file("."))
       // Java
       Libraries.jsonValidator,
       Libraries.awsJava,
-      // JAXB APIs
-      Libraries.javaxXmlBind,
-      Libraries.jaxbCore,
-      Libraries.jaxbImpl,
-      Libraries.activation,
       // Scala
       Libraries.circeParser,
       Libraries.catsEffect,
