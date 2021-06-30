@@ -41,7 +41,7 @@ object Common {
     def apply[A](fa: IO[A]): Failing[A] = EitherT.liftF(fa)
   }
 
-  def liftEither[A](e: Either[Error, A]): Stream[Failing[?], A] =
+  def liftEither[A](e: Either[Error, A]): Stream[Failing[*], A] =
     Stream.eval(EitherT.fromEither[IO](e))
 
   sealed trait GapError extends Product with Serializable {

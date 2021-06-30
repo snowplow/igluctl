@@ -59,7 +59,7 @@ object Deploy {
         cfg.generate.output, cfg.generate.withJsonPaths, cfg.generate.rawMode,
         cfg.generate.dbSchema, cfg.generate.varcharSize, cfg.generate.splitProduct,
         cfg.generate.noHeader, cfg.generate.force, cfg.generate.owner)
-      actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], ?], List[String]](_.process)
+      actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], *], List[String]](_.process)
     } yield output ::: actionsOut.flatten
   }
 
