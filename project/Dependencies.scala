@@ -28,7 +28,7 @@ object Dependencies {
     val doobie           = "0.13.4"
     // Scala (test only)
     val specs2           = "4.0.1"
-    val scalaCheck       = "1.13.5"
+    val scalaCheck       = "1.15.4"
   }
 
   object Libraries {
