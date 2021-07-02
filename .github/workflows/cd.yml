@@ -20,9 +20,19 @@ jobs:
       - name: Create release artifact
         run: sbt clean assembly
 
+      - name: Get current version
+        id: ver
+        run: echo "::set-output name=tag::${GITHUB_REF#refs/tags/}"
+
+      - name: Zip artifact
+        uses: papeloto/action-zip@v1
+        with:
+          files: target/scala-2.12/igluctl
+          dest: target/scala-2.12/igluctl_${{ steps.ver.outputs.tag }}.zip
+
       - name: Create GitHub release & Attach artifacts
         uses: softprops/action-gh-release@v1
         with:
-          files: target/scala-2.12/igluctl
+          files: target/scala-2.12/igluctl_${{ steps.ver.outputs.tag }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
