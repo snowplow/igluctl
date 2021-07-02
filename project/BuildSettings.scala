@@ -35,25 +35,25 @@ object BuildSettings {
       "-language:higherKinds",
       "-Ypartial-unification",
       "-Xfuture"),
-    scalacOptions in (Compile, console) := Seq(
+    Compile / console / scalacOptions := Seq(
       "-deprecation",
       "-encoding", "UTF-8"
     ),
-    scalacOptions in (Compile, doc) ++= Seq(
+    Compile / doc / scalacOptions ++= Seq(
       "-no-link-warnings" // Suppresses problems with Scaladoc @throws links
     ),
     javacOptions := Seq(
       "-source", "11",
       "-target", "11"
     ),
-    scalacOptions in Test := Seq("-Yrangepos"),
+    Test / scalacOptions := Seq("-Yrangepos"),
 
     addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
   )
 
   lazy val scalifySettings = Seq(
-    sourceGenerators in Compile += Def.task {
-      val file = (sourceManaged in Compile).value / "settings.scala"
+    Compile / sourceGenerators += Def.task {
+      val file = (Compile / sourceManaged).value / "settings.scala"
       IO.write(file, """package com.snowplowanalytics.iglu.ctl.generated
                        |object ProjectSettings {
                        |  val version = "%s"
@@ -68,21 +68,21 @@ object BuildSettings {
   lazy val sbtAssemblySettings: Seq[Setting[_]] = Seq(
 
     // Executable jarfile
-    assemblyOption in assembly ~= { _.copy(prependShellScript = Some(defaultShellScript)) },
+    assembly / assemblyOption ~= { _.copy(prependShellScript = Some(defaultShellScript)) },
 
     // Name it as an executable
-    assemblyJarName in assembly := { name.value },
+    assembly / assemblyJarName := { name.value },
 
     // Make this executable
-    mainClass in assembly := Some("com.snowplowanalytics.iglu.ctl.Main"),
+    assembly / mainClass := Some("com.snowplowanalytics.iglu.ctl.Main"),
 
-    assemblyMergeStrategy in assembly := {
+    assembly / assemblyMergeStrategy := {
       case PathList("com", "github", "fge", tail@_*) => MergeStrategy.first
       case x if x.startsWith("scala/annotation/nowarn") => MergeStrategy.first
       case x if x.endsWith("module-info.class") => MergeStrategy.first
       case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
       case x =>
-        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
     }
   )
