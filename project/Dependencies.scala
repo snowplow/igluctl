@@ -26,6 +26,7 @@ object Dependencies {
     val scalajHttp       = "2.4.2"
     val fs2              = "2.5.9"
     val doobie           = "0.13.4"
+    val logback          = "1.2.3"
     // Scala (test only)
     val specs2           = "4.12.3"
     val scalaCheck       = "1.15.4"
@@ -45,6 +46,7 @@ object Dependencies {
     val fs2Io            = "co.fs2"                     %% "fs2-io"                    % V.fs2
     val doobieCore       = "org.tpolecat"               %% "doobie-core"               % V.doobie
     val doobiePostgres   = "org.tpolecat"               %% "doobie-postgres"           % V.doobie
+    val logback          = "ch.qos.logback"             % "logback-classic"            % V.logback % Runtime
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2-core"               % V.specs2         % "test"
     val scalaCheck       = "org.scalacheck"             %% "scalacheck"                % V.scalaCheck     % "test"
