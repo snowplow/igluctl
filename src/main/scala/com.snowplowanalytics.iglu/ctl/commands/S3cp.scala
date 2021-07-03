@@ -21,11 +21,11 @@ import cats.implicits._
 
 import fs2.Stream
 
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
-import com.amazonaws.auth.{AWSCredentialsProvider, AWSStaticCredentialsProvider, BasicAWSCredentials, DefaultAWSCredentialsProviderChain}
-import com.amazonaws.regions.Regions
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
-import com.amazonaws.{AmazonClientException, AmazonServiceException}
+import software.amazon.awssdk.regions.Region
+import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.PutObjectRequest
+import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, AwsCredentialsProvider, DefaultCredentialsProvider, ProfileCredentialsProvider, StaticCredentialsProvider}
+import software.amazon.awssdk.core.exception.SdkException
 
 import Common.Error
 
@@ -51,27 +51,27 @@ object S3cp {
   def getS3(accessKeyId: Option[String],
             secretAccessKey: Option[String],
             profile: Option[String],
-            region: Option[String]): EitherT[IO, Error, AmazonS3] = {
+            region: Option[String]): EitherT[IO, Error, S3Client] = {
 
     val credentialsProvider = (accessKeyId, secretAccessKey, profile) match {
       case (Some(keyId), Some(secret), None) =>
-        EitherT.liftF[IO, Error, AWSCredentialsProvider](IO(new AWSStaticCredentialsProvider(new BasicAWSCredentials(keyId, secret))))
+        EitherT.liftF[IO, Error, AwsCredentialsProvider](IO(StaticCredentialsProvider.create(AwsBasicCredentials.create(keyId, secret))))
       case (None, None, Some(p)) =>
-        EitherT.liftF[IO, Error, AWSCredentialsProvider](IO(new ProfileCredentialsProvider(p)))
+        EitherT.liftF[IO, Error, AwsCredentialsProvider](IO(ProfileCredentialsProvider.create(p)))
       case (None, None, None) =>
-        EitherT.liftF[IO, Error, AWSCredentialsProvider](IO(DefaultAWSCredentialsProviderChain.getInstance()))
+        EitherT.liftF[IO, Error, AwsCredentialsProvider](IO(DefaultCredentialsProvider.create))
       case _ =>
-        EitherT.leftT[IO, AWSCredentialsProvider](Error.ConfigParseError("Invalid AWS authentication method. Following methods are supported: static credentials, profile, default credentials chain"))
+        EitherT.leftT[IO, AwsCredentialsProvider](Error.ConfigParseError("Invalid AWS authentication method. Following methods are supported: static credentials, profile, default credentials chain"))
     }
 
-    val awsRegion = region.map(Regions.fromName).getOrElse(Regions.DEFAULT_REGION)
-
     for {
-      provider <- credentialsProvider
-      client <- EitherT.liftF(IO(AmazonS3ClientBuilder.standard()
-        .withCredentials(provider)
-        .withRegion(awsRegion)
-        .build()))
+      provider  <- credentialsProvider
+      client <- EitherT.liftF(IO {
+        region.foldLeft(S3Client.builder.credentialsProvider(provider)) {
+          case (builder, r) => builder.region(Region.of(r))
+        }
+        .build
+      })
     } yield client
   }
 
@@ -84,16 +84,13 @@ object S3cp {
     * @param service S3 client object
     * @return either error or successful message
     */
-  def upload(file: Path, path: String, service: AmazonS3, bucketName: String): EitherT[IO, Error, String] = {
+  def upload(file: Path, path: String, service: S3Client, bucketName: String): EitherT[IO, Error, String] = {
     EitherT(IO {
-      try {
-        service.putObject(bucketName, path, file.toFile)
-        s"File [${file.toAbsolutePath}] uploaded as [s3://${bucketName + "/" + path}]".asRight
-      } catch {
-        case e: AmazonClientException => Error.ServiceError(e.toString).asLeft
-        case e: AmazonServiceException => Error.ServiceError(e.toString).asLeft
-      }
-    })
+      service.putObject(PutObjectRequest.builder.bucket(bucketName).key(path).build, file)
+      s"File [${file.toAbsolutePath}] uploaded as [s3://${bucketName + "/" + path}]"
+    }.attemptNarrow[SdkException]).leftMap {
+        case e: SdkException => Error.ServiceError(e.toString)
+    }
   }
 
   /**
