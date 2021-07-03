@@ -78,6 +78,8 @@ object BuildSettings {
 
     assemblyMergeStrategy in assembly := {
       case PathList("com", "github", "fge", tail@_*) => MergeStrategy.first
+      case x if x.endsWith("module-info.class") => MergeStrategy.first
+      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
       case x =>
         val oldStrategy = (assemblyMergeStrategy in assembly).value
         oldStrategy(x)
