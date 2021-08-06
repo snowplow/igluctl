@@ -59,7 +59,7 @@ object Generate {
 
     for {
       _           <- File.checkOutput(output)
-      schemaFiles <- EitherT(File.readSchemas(input).map(_.toEither))
+      schemaFiles <- EitherT(File.readSchemas(input).map(leftBiasedIor))
       igluSchemas = parseSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       schemas     <- EitherT.fromEither[IO](igluSchemas)
       result      = transform(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner, rawMode)(schemas)
@@ -324,4 +324,8 @@ object Generate {
     val content = JsonPathGenerator.getJsonPathsFile(ddl.orderedSubSchemas, rawMode)
     textFile(Paths.get(ddl.path, ddl.fileName + ".json"), content)
   }
+
+  /** Unlike Ior.toEither, converts to a Left if both A and B are available */
+  private def leftBiasedIor[A, B](ior: Ior[A, B]): Either[A, B] =
+    ior.fold(Left(_), Right(_), (a, _) => Left(a))
 }
