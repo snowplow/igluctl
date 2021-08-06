@@ -16,11 +16,9 @@ package commands
 import java.nio.file.Path
 import java.util.UUID
 
-import cats.data.EitherT
-import cats.effect.IO
+import cats.data.{EitherT, NonEmptyList}
+import cats.effect.{IO, Resource}
 import cats.implicits._
-
-import fs2.Stream
 
 import scalaj.http.{HttpRequest, HttpResponse}
 
@@ -28,7 +26,6 @@ import io.circe.Decoder
 import io.circe.jawn.parse
 import io.circe.generic.semiauto._
 
-import com.snowplowanalytics.iglu.ctl.File.{filterJsonSchemas, streamFiles}
 import com.snowplowanalytics.iglu.ctl.{ Result => IgluctlResult }
 
 /**
@@ -50,20 +47,17 @@ object Push {
               apiKey: UUID,
               isPublic: Boolean,
               legacy: Boolean): IgluctlResult = {
-    val stream = for {
-      key    <- if (legacy) Stream.resource(Server.temporaryKeys(registryRoot, apiKey)).map(_.write) else Stream.emit(apiKey)
-      file   <- streamFiles(inputDir, Some(filterJsonSchemas)).translate[IO, Failing](Common.liftIO).map(_.flatMap(_.asJsonSchema))
-      result <- file match {
-        case Right(schema) =>
-          val request = Server.buildPushRequest(registryRoot, isPublic, schema.content, key)
-          Stream.eval[Failing, Result](postSchema(request))
-        case Left(error) =>
-          Stream.eval(EitherT.leftT[IO, Result](error))
-      }
-      _      <- Stream.eval[Failing, Unit](EitherT.liftF(IO(println(result.asString))))
-    } yield ()
+    val apiKeyResource: Resource[Failing, UUID] = if (legacy) Server.temporaryKeys(registryRoot, apiKey).map(_.write) else Resource.pure[Failing, UUID](apiKey)
 
-    EitherT(stream.compile.drain.value.map(_.toEitherNel.as(Nil)))
+    apiKeyResource.mapK[Failing, FailingNel](Common.liftFailingNel).use { apiKey =>
+      for {
+        files   <- EitherT(File.readSchemas(inputDir).map(Common.leftBiasedIor))
+        result  <- files.toList.traverse { file =>
+            val request = Server.buildPushRequest(registryRoot, isPublic, file.content, apiKey)
+            postSchema(request).map(_.asString)
+        }.leftMap(NonEmptyList.of(_))
+      } yield result
+    }
   }
 
   /**

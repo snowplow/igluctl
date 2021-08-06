@@ -23,6 +23,7 @@ import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 package object ctl {
   /** Anything that can bear error message */
   type Failing[A] = EitherT[IO, Common.Error, A]
+  type FailingNel[A] = EitherT[IO, NonEmptyList[Common.Error], A]
 
   /**
     * Result of command execution,

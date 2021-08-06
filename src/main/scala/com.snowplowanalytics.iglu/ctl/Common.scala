@@ -18,7 +18,7 @@ import scala.annotation.tailrec
 
 import cats.arrow.FunctionK
 import cats.{Foldable, Show}
-import cats.data.{EitherNel, EitherT, NonEmptyList}
+import cats.data.{EitherNel, EitherT, Ior, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 import cats.Order
@@ -41,8 +41,16 @@ object Common {
     def apply[A](fa: IO[A]): Failing[A] = EitherT.liftF(fa)
   }
 
+  val liftFailingNel: FunctionK[Failing, FailingNel] = new FunctionK[Failing, FailingNel] {
+    def apply[A](fa: Failing[A]): FailingNel[A] = fa.leftMap(NonEmptyList.of(_))
+  }
+
   def liftEither[A](e: Either[Error, A]): Stream[Failing[*], A] =
     Stream.eval(EitherT.fromEither[IO](e))
+
+  /** Unlike Ior.toEither, converts to a Left if both A and B are available */
+  def leftBiasedIor[A, B](ior: Ior[A, B]): Either[A, B] =
+    ior.fold(Left(_), Right(_), (a, _) => Left(a))
 
   sealed trait GapError extends Product with Serializable {
     def show: String = this match {
