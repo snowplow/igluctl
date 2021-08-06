@@ -20,7 +20,7 @@ import io.circe.jawn.parse
 import io.circe.syntax._
 import io.circe.generic.semiauto._
 
-import scalaj.http.{Http, HttpRequest}
+import scalaj.http.{Http, HttpRequest, HttpResponse}
 
 import Common.Error
 
@@ -182,9 +182,14 @@ object Server {
   def getApiKeys(request: HttpRequest): Failing[ApiKeys] =
     for {
       response  <- EitherT.liftF(IO(request.asString))
-      json      <- EitherT.fromEither[IO](parse(response.body)).leftMap(Error.fromServer(response))
+      json      <- EitherT.fromEither[IO](parseApiKeyResponse(response))
       extracted <- EitherT.fromEither[IO](json.as[ApiKeys]).leftMap(Error.fromServer(response))
     } yield extracted
+
+  def parseApiKeyResponse(response: HttpResponse[String]): Either[Error, Json] =
+    if (response.isSuccess) {
+      parse(response.body).leftMap(Error.fromServer(response))
+    } else Left(Error.Message(s"Unexpected status code ${response.code}. Response body: ${response.body}."))
 
   /** Check if Server is pre-0.6.0 */
   def checkOldServer(registryRoot: HttpUrl): Failing[Boolean] = {
