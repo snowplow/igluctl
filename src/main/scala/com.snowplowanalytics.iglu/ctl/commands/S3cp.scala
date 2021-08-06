@@ -19,8 +19,6 @@ import cats.data.{ EitherT, NonEmptyList }
 import cats.effect.IO
 import cats.implicits._
 
-import fs2.Stream
-
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.PutObjectRequest
@@ -36,17 +34,15 @@ object S3cp {
               accessKeyId: Option[String],
               secretAccessKey: Option[String],
               profile: Option[String],
-              region: Option[String]): Result = {
-
-    val schemasT: Stream[Failing, String] = for {
-      s3      <- Stream.eval(getS3(accessKeyId, secretAccessKey, profile, region))
-      file    <- File.streamPaths(inputDir).translate[IO, Failing](Common.liftIO).flatMap(Common.liftEither)
-      key      = getS3Path(file, inputDir, path)
-      result  <- Stream.eval(upload(file, key, s3, bucketName))
+              region: Option[String]): Result =
+    for {
+      s3      <- getS3(accessKeyId, secretAccessKey, profile, region).leftMap(NonEmptyList.of(_))
+      files   <- EitherT(File.readSchemas(inputDir).map(Common.leftBiasedIor))
+      result  <- files.toList.traverse { file =>
+        val key = getS3Path(file.path, inputDir, path)
+        upload(file.path, key, s3, bucketName)
+      }.leftMap(NonEmptyList.of(_))
     } yield result
-
-    schemasT.compile.toList.leftMap(NonEmptyList.of(_))
-  }
 
   def getS3(accessKeyId: Option[String],
             secretAccessKey: Option[String],
