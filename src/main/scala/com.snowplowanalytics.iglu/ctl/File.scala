@@ -105,8 +105,6 @@ sealed trait File[A] extends Serializable { self =>
 /** Module for manipulating file system and constructing instances of [[File]] */
 object File {
 
-  val separator: String = System.getProperty("file.separator", "/")
-
   implicit def eqFile[A: Eq]: Eq[File[A]] =
     Eq.instance((a: File[A], b: File[A]) => a.path == b.path && a.content === b.content)
 
@@ -357,10 +355,8 @@ object File {
    * @param path absolute path to file
    * @return list of all parts of absolute file path ready to be joined by `separator`
    */
-  def splitPath(path: String): List[String] = {
-    val sep = if (separator == """\""") """\\""" else separator
-    path.split(sep).toList
-  }
+  def splitPath(path: String): List[String] =
+    Path.of(path).asScala.toList.map(_.toString)
 
   def splitPath(file: Path): List[String] =
     splitPath(file.toAbsolutePath.toString)

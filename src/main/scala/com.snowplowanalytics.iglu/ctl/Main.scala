@@ -58,8 +58,8 @@ object Main extends IOApp {
         Push.process(input, registryRoot, apikey, public, legacy)
       case Right(Command.StaticPull(output, registryRoot, apikey)) =>
         Pull.process(output, registryRoot, apikey)
-      case Right(Command.StaticS3Cp(input, bucket, s3Path, accessKey, secretKey, profile, region)) =>
-        S3cp.process(input, bucket, s3Path, accessKey, secretKey, profile, region)
+      case Right(Command.StaticS3Cp(input, bucket, s3Path, accessKey, secretKey, profile, region, skipSchemaLists)) =>
+        S3cp.process(input, bucket, s3Path, accessKey, secretKey, profile, region, skipSchemaLists)
 
       case Right(Command.ServerKeygen(server, masterKey, prefix)) =>
         Keygen.process(server, masterKey, prefix)
