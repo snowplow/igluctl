@@ -57,7 +57,8 @@ class DeploySpec extends Specification { def is = s2"""
                 "uploadFormat": "jsonschema",
                 "bucketPath": "s3://bucket/path_1/path_2",
                 "profile": "profile-2",
-                "region": "eu-west-2"
+                "region": "eu-west-2",
+                "skipSchemaLists": true
             }
         ]
       }"""
@@ -81,7 +82,7 @@ class DeploySpec extends Specification { def is = s2"""
         )),
         IgluctlAction.S3Cp(Command.StaticS3Cp(
           inputPath, "bucket", Some("path_1/path_2"),
-          None, None, Some("profile-2"), Some("eu-west-2")
+          None, None, Some("profile-2"), Some("eu-west-2"), true
         ))
       )
     )

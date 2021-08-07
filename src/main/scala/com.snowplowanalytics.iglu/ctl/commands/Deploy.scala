@@ -133,13 +133,14 @@ object Deploy {
             bucket     <- cursor.downField("bucketPath").as[String]
             profile    <- cursor.downField("profile").as[String]
             region     <- cursor.downField("region").as[String]
+            skipSchemaLists <- cursor.downField("skipSchemaLists").as[Boolean]
             bucketPath <- bucket.stripPrefix("s3://").split("/").toList match {
               case b :: Nil => (b, None).asRight
               case b :: p => (b, Some(p.mkString("/"))).asRight
               case _ => DecodingFailure("bucketPath has invalid format", cursor.history).asLeft
             }
             (b, p) = bucketPath
-          } yield IgluctlAction.S3Cp(Command.StaticS3Cp(tempPath, b, p, None, None, Some(profile), Some(region)))
+          } yield IgluctlAction.S3Cp(Command.StaticS3Cp(tempPath, b, p, None, None, Some(profile), Some(region), skipSchemaLists))
         case Right("push") =>
           for {
             registryRoot <- cursor.downField("registry").as[Server.HttpUrl]
