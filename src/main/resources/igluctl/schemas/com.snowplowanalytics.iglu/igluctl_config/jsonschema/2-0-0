@@ -207,6 +207,14 @@
                   "null"
                 ],
                 "default": "us-west-2"
+              },
+              "skipSchemaLists": {
+                "description": "Don't generate and upload schema list files",
+                "type": [
+                  "boolean",
+                  "null"
+                ],
+                "default": false
               }
             },
             "required": [
@@ -214,7 +222,8 @@
               "uploadFormat",
               "bucketPath",
               "profile",
-              "region"
+              "region",
+              "skipSchemaLists"
             ]
           }
         ]

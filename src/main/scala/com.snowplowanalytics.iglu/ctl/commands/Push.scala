@@ -61,51 +61,6 @@ object Push {
   }
 
   /**
-    * End-of-the-world data containing all results of uploading and
-    * app closing logic
-    */
-  case class Total(updates: Int, creates: Int, failures: Int, unknown: Int) {
-    /**
-      * Print summary information and exit with 0 or 1 status depending on
-      * presence of errors during processing
-      */
-    def exit(): Unit = {
-      println(s"TOTAL: ${creates + updates} Schemas successfully uploaded ($creates created; $updates updated)")
-      println(s"TOTAL: $failures failed Schema uploads")
-      if (unknown > 0) println(s"WARNING: $unknown unknown statuses")
-
-      if (unknown > 0 || failures > 0) sys.exit(1)
-      else ()
-    }
-
-    /**
-      * Modify end-of-the-world object, by sinking reports and printing info
-      * Performs IO
-      *
-      * @param result result of upload
-      * @return new modified total object
-      */
-    def add(result: Result): Total = result match {
-      case s @ Result(_, Status.Updated) =>
-        println(s"SUCCESS: ${s.asString}")
-        copy(updates = updates + 1)
-      case s @ Result(_, Status.Created) =>
-        println(s"SUCCESS: ${s.asString}")
-        copy(creates = creates + 1)
-      case s @ Result(_, Status.Failed) =>
-        println(s"FAILURE: ${s.asString}")
-        copy(failures = failures + 1)
-      case s @ Result(_, Status.Unknown) =>
-        println(s"FAILURE: ${s.asString}")
-        copy(unknown = unknown + 1)
-    }
-  }
-
-  object Total {
-    val empty = Total(0,0,0,0)
-  }
-
-  /**
    * Common server message extracted from HTTP JSON response
    *
    * @param status HTTP status code

@@ -27,7 +27,7 @@ object IgluctlConfig {
   object IgluctlAction {
     case class S3Cp(command: Command.StaticS3Cp) extends IgluctlAction {
       def process: Result =
-        commands.S3cp.process(command.input, command.bucket, command.s3Path, command.accessKeyId, command.secretKeyId, command.profile, command.region)
+        commands.S3cp.process(command.input, command.bucket, command.s3Path, command.accessKeyId, command.secretKeyId, command.profile, command.region, command.skipSchemaLists)
     }
 
     case class Push(command: Command.StaticPush) extends IgluctlAction {

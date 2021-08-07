@@ -57,7 +57,7 @@ class CommandSpec extends Specification { def is = s2"""
     val staticS3cp = Command
       .parse("static s3cp .. anton-enrichment-test --s3path schemas --region us-east-1".split(" ").toList)
 
-    staticS3cp must beRight(Command.StaticS3Cp(Paths.get(".."), "anton-enrichment-test", Some("schemas"), None, None, None, Some("us-east-1")))
+    staticS3cp must beRight(Command.StaticS3Cp(Paths.get(".."), "anton-enrichment-test", Some("schemas"), None, None, None, Some("us-east-1"), false))
   }
 
   def e4 = {
