@@ -86,6 +86,7 @@ object Command {
   val secretAccessKey = Opts.option[String]("secretAccessKey", "AWS Secret Access Key", metavar = "key").orNone
   val profile = Opts.option[String]("profile", "AWS Profile name", metavar = "name").orNone
   val region = Opts.option[String]("region", "AWS Region", metavar = "name")
+  val skipSchemaLists = Opts.flag("skip-schema-lists", "Do not generate and upload schema list objects").orFalse
 
   // lint options
   val lintersListText =
@@ -137,7 +138,7 @@ object Command {
     (output, registryRoot, apikey.orNone).mapN(StaticPull.apply)
   }
   val staticS3Cp = Opts.subcommand("s3cp", "Upload Schemas or JSON Path files onto S3") {
-    (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region.orNone).mapN(StaticS3Cp.apply)
+    (input, bucket, s3path, accessKeyId, secretAccessKey, profile, region.orNone, skipSchemaLists).mapN(StaticS3Cp.apply)
   }
   val serverKeygen = Opts.subcommand("keygen", "Generate API key on remote Iglu Server") {
     (registryRoot, apikey, vendorPrefix).mapN(ServerKeygen.apply)
@@ -194,7 +195,8 @@ object Command {
                         accessKeyId: Option[String],
                         secretKeyId: Option[String],
                         profile: Option[String],
-                        region: Option[String]) extends StaticCommand
+                        region: Option[String],
+                        skipSchemaLists: Boolean) extends StaticCommand
 
   case class Lint(input: Path,
                   skipWarnings: Boolean,
