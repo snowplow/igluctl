@@ -21,15 +21,10 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect._
 import cats.implicits._
 
+import com.typesafe.config.{Config => RawConfig, ConfigFactory}
+
 import io.circe._
-
-import com.snowplowanalytics.iglu.client.Client
-import com.snowplowanalytics.iglu.client.resolver.Resolver
-import com.snowplowanalytics.iglu.client.resolver.registries.Registry
-import com.snowplowanalytics.iglu.client.validator.CirceValidator
-
-import com.snowplowanalytics.iglu.core.SelfDescribingData
-import com.snowplowanalytics.iglu.core.circe.implicits._
+import io.circe.config.parser
 
 import com.snowplowanalytics.iglu.ctl.File.readFile
 import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction
@@ -40,20 +35,15 @@ object Deploy {
 
   private val tempPath = Paths.get("/temp")
 
-  lazy val resolver: Resolver[IO] = Resolver(List(Registry.EmbeddedRegistry, Registry.IgluCentral), None)
-  lazy val client: Client[IO, Json] = Client(resolver, CirceValidator)
-
   /**
     * Primary method of static deploy command
     * Performs usual schema workflow at once, per configuration file
     * Short-circuits on first failed step
     */
-  def process(configFile: Path)(implicit t: Timer[IO]): Result = {
+  def process(configFile: Path): Result = {
     for {
-      configDoc    <- EitherT(readFile(configFile).map(_.flatMap(_.asJson).toEitherNel))
-      selfDescConf <- EitherT.fromEither[IO](SelfDescribingData.parse(configDoc.content).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e.toString))))
-      _            <- client.check(selfDescConf).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e.toString)))
-      cfg          <- EitherT.fromEither[IO](selfDescConf.data.as[IgluctlConfig].leftMap(e => NonEmptyList.of(Error.ConfigParseError(e.toString))))
+      configDoc    <- EitherT(readFile(configFile)).leftMap(NonEmptyList.of(_))
+      cfg          <- EitherT.fromEither[IO](parseConfig(configDoc.content)).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e)))
       output       <- Lint.process(cfg.lint.input, cfg.lint.skipChecks, cfg.lint.skipWarnings)
       _            <- Generate.process(cfg.generate.input,
         cfg.generate.output, cfg.generate.withJsonPaths, cfg.generate.rawMode,
@@ -62,6 +52,29 @@ object Deploy {
       actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], *], List[String]](_.process)
     } yield output ::: actionsOut.flatten
   }
+
+  private def parseConfig(text: String): Either[String, IgluctlConfig] =
+    for {
+      raw <- Either
+        .catchNonFatal(ConfigFactory.parseString(text).resolve)
+        .leftMap(_.toString)
+      raw <- optionallySdj(raw).asRight
+      parsed <- parser
+        .decode[IgluctlConfig](raw)
+        .leftMap(e => s"Could not parse config: ${e.show}")
+    } yield parsed
+
+  /**
+   * Accept the configuration as either regular hocon or as self-describing json.
+   *
+   * This is included for legacy reasons: igluctl was previously configured with SDJ only but now we
+   * prefer hocon. The SDJ parsing is lax: we do not validate the metadata.
+   */
+  private def optionallySdj(config: RawConfig): RawConfig =
+    if (config.hasPath("data"))
+      config.getConfig("data")
+    else
+      config
 
   /** Configuration key that can represent either "hard-coded" value or env var with API key */
   private[ctl] sealed trait ApiKeySecret {
@@ -133,7 +146,7 @@ object Deploy {
             bucket     <- cursor.downField("bucketPath").as[String]
             profile    <- cursor.downField("profile").as[String]
             region     <- cursor.downField("region").as[String]
-            skipSchemaLists <- cursor.downField("skipSchemaLists").as[Boolean]
+            skipSchemaLists <- cursor.getOrElse[Boolean]("skipSchemaLists")(false)
             bucketPath <- bucket.stripPrefix("s3://").split("/").toList match {
               case b :: Nil => (b, None).asRight
               case b :: p => (b, Some(p.mkString("/"))).asRight
