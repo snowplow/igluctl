@@ -19,6 +19,7 @@ object Dependencies {
     val awsJava          = "2.17.13"
     // Scala
     val circe            = "0.14.1"
+    val circeConfig      = "0.8.0"
     val catsEffect       = "2.5.3"
     val schemaddl        = "0.14.1"
     val igluClient       = "1.1.1"
@@ -37,6 +38,7 @@ object Dependencies {
     val awsJava          = "software.amazon.awssdk"     %  "s3"                        % V.awsJava
     // Scala
     val circeParser      = "io.circe"                   %% "circe-jawn"                % V.circe
+    val circeConfig      = "io.circe"                   %% "circe-config"              % V.circeConfig
     val catsEffect       = "org.typelevel"              %% "cats-effect"               % V.catsEffect
     val igluClient       = "com.snowplowanalytics"      %% "iglu-scala-client"         % V.igluClient
     val schemaddl        = "com.snowplowanalytics"      %% "schema-ddl"                % V.schemaddl

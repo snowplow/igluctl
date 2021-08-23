@@ -29,6 +29,7 @@ lazy val root = project.in(file("."))
       Libraries.awsJava,
       // Scala
       Libraries.circeParser,
+      Libraries.circeConfig,
       Libraries.catsEffect,
       Libraries.schemaddl,
       Libraries.igluClient,

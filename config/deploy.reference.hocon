@@ -1,0 +1,79 @@
+  {
+
+    // Path to input schemas
+    "input": "file:///home/streeter/clones/snowplow/iglu-central/schemas/"
+
+    // Configuration for lint command
+    "lint": {
+      // Don't output messages with log level less than ERROR
+      "skipWarnings": true
+
+      // Lint using the provided linters
+      "includedChecks": [
+        "rootObject"
+        "unknownFormats"
+        "numericMinMax"
+        "stringLength"
+        "optionalNull"
+        "description"
+        "stringMaxLengthRange"
+      ]
+    }
+
+    // Configuration for the static generate command
+    "generate": {
+      // Directory to put generated data
+      "output": "file:///home/streeter/clones/snowplow-incubator/igluctl/temp"
+
+      // Redshift database schema
+      "dbschema": "atomic"
+
+      // Redshift table owner
+      "owner": "a_new_owner"
+
+      // Redshift varchar size
+      "varcharSize": 4096
+
+      // Produce JSON Paths files along with DDL
+      "withJsonPaths": true
+
+      // Whether to place header comments into output DDL
+      "noHeader": false
+
+      // Allow overwriting existing manually-edited files
+      "force": false
+    }
+
+
+    // Configuration for s3cp and push commands
+    "actions": [
+      {
+        // Upload schemas from folder to an Iglu server
+        "action": "push"
+
+        // Whether schemas should be public on the server.
+        "isPublic": true
+        
+        // The iglu server we push to
+        "registry": "http://iglu-server.com"
+
+        // Authentication.  Note we can resolve environment variables.
+        "apikey": "bd96b5ff-7eb7-4085-83e0-97ac4954b891"
+        "apikey": ${APIKEY_1}
+      }
+
+      {
+        // Upload schemas from folder to S3
+        "action": "s3cp"
+        "uploadFormat": "jsonschema"
+        "bucketPath": "s3://path-to-s3"
+
+        // aws sdk profile to use
+        "profile": "profile-1"
+
+        // aws region
+        "region": "eu-east-2"
+      }
+    ]
+
+}
