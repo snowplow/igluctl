@@ -17,16 +17,10 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 
 Make sure you have [Oracle JRE 8][jre] installed.
 
-As of 0.7.2 release, artifacts are attached to GitHub releases. e.g. 0.7.2 can be downloaded from
+Artifacts are attached to GitHub releases. e.g. 0.8.0 can be downloaded from
 
 ```
-https://github.com/snowplow-incubator/igluctl/releases/download/0.7.2/igluctl
-```
-
-You can download pre-0.7.2 igluctl versions from our Bintray, e.g. 0.7.1 can be downloaded from
-
-```
-http://dl.bintray.com/snowplow/snowplow-generic/igluctl_0.7.1.zip
+https://github.com/snowplow-incubator/igluctl/releases/download/0.8.0/igluctl
 ```
 
 ### Windows
