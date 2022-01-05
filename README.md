@@ -87,7 +87,7 @@ and also "sanity check", which checks that particular JSON Schema can always val
 
 ## Copyright and License
 
-Igluctl is copyright 2016-2021 Snowplow Analytics Ltd.
+Igluctl is copyright 2016-2022 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0][license]** (the "License");
 you may not use this software except in compliance with the License.
