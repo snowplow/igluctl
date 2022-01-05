@@ -12,7 +12,6 @@
  */
 package com.snowplowanalytics.iglu.ctl
 
-import cats.syntax.either._
 import io.circe.Json
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 import com.snowplowanalytics.iglu.core.circe.implicits._

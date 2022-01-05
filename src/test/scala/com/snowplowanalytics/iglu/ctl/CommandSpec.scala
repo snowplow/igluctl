@@ -16,14 +16,11 @@ package com.snowplowanalytics.iglu.ctl
 import java.nio.file.Paths
 import java.util.UUID
 
-// cats
-import cats.syntax.either._
-
 // decline
 import com.monovore.decline.Help
 
 // Schema DDL
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter.{ unknownFormats, rootObject, allLintersMap }
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter.{ unknownFormats, rootObject}
 
 // specs2
 import org.specs2.Specification
