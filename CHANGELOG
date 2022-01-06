@@ -1,3 +1,9 @@
+Version 0.8.1 (2022-01-06)
+--------------------------
+Update 'action-zip' owner in 'cd' job (#97)
+Replace '2021' with '2022' in all license headers (#94)
+Remove 'Path.of' usages to preserve compatibility with java8 (#91)
+
 Version 0.8.0 (2021-08-27)
 --------------------------
 Use hocon format for the deploy configuration file (#83)
