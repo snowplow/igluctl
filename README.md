@@ -17,10 +17,10 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 
 Make sure you have [Oracle JRE 8][jre] installed.
 
-Artifacts are attached to GitHub releases. e.g. 0.8.0 can be downloaded from
+Artifacts are attached to GitHub releases. e.g. 0.8.1 can be downloaded from
 
 ```
-https://github.com/snowplow-incubator/igluctl/releases/download/0.8.0/igluctl
+https://github.com/snowplow-incubator/igluctl/releases/download/0.8.1/igluctl
 ```
 
 ### Windows
@@ -87,7 +87,7 @@ and also "sanity check", which checks that particular JSON Schema can always val
 
 ## Copyright and License
 
-Igluctl is copyright 2016-2021 Snowplow Analytics Ltd.
+Igluctl is copyright 2016-2022 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0][license]** (the "License");
 you may not use this software except in compliance with the License.

@@ -1,5 +1,5 @@
 /**
-  * Copyright (c) 2014-2021 Snowplow Analytics Ltd. All rights reserved.
+  * Copyright (c) 2014-2022 Snowplow Analytics Ltd. All rights reserved.
   *
   * This program is licensed to you under the Apache License Version 2.0,
   * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -18,7 +18,7 @@ lazy val root = project.in(file("."))
   .settings(
     name                  :=  "igluctl",
     organization          :=  "com.snowplowanalytics",
-    version               :=  "0.8.0",
+    version               :=  "0.8.1",
     description           :=  "Iglu Command Line Interface",
     scalaVersion          :=  "2.12.14"
   )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2012-2022 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -17,6 +17,7 @@ import cats.data.{EitherT, Ior, IorNel, NonEmptyList}
 import cats.{Eq, Show}
 import cats.implicits._
 import cats.effect.IO
+
 
 // Circe
 import io.circe._
@@ -356,7 +357,7 @@ object File {
    * @return list of all parts of absolute file path ready to be joined by `separator`
    */
   def splitPath(path: String): List[String] =
-    Path.of(path).asScala.toList.map(_.toString)
+    Paths.get(path).asScala.toList.map(_.toString)
 
   def splitPath(file: Path): List[String] =
     splitPath(file.toAbsolutePath.toString)

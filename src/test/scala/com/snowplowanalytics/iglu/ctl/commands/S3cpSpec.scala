@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2012-2022 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -12,31 +12,30 @@
  */
 package com.snowplowanalytics.iglu.ctl.commands
 
-import java.nio.file.Path
-
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
-
 import org.specs2.mutable.Specification
+
+import java.nio.file.Paths
 
 class S3cpSpec extends Specification {
 
   "fileToS3Path" >> {
     "should resolve file names with no custom prefix" >> {
-      val path = Path.of("com.acme", "myschema", "jsonschema", "1-0-0")
+      val path = Paths.get("com.acme", "myschema", "jsonschema", "1-0-0")
       val result = S3cp.fileToS3Path(path, None)
 
       result must_== "schemas/com.acme/myschema/jsonschema/1-0-0"
     }
 
     "should resolve top level path with no custom prefix" >> {
-      val path = Path.of("")
+      val path = Paths.get("")
       val result = S3cp.fileToS3Path(path, None)
 
       result must_== "schemas"
     }
 
     "should resolve file names with a custom prefix" >> {
-      val path = Path.of("com.acme", "myschema", "jsonschema", "1-0-0")
+      val path = Paths.get("com.acme", "myschema", "jsonschema", "1-0-0")
       List("myprefix", "/myprefix", "myprefix/").map { prefix =>
         val result = S3cp.fileToS3Path(path, Some(prefix))
 
@@ -57,12 +56,12 @@ class S3cpSpec extends Specification {
         )
 
       val expected = Map(
-        Path.of("vendor1", "name1", "jsonschema", "1") -> List(
+        Paths.get("vendor1", "name1", "jsonschema", "1") -> List(
             "iglu:vendor1/name1/jsonschema/1-0-0",
             "iglu:vendor1/name1/jsonschema/1-0-1",
             "iglu:vendor1/name1/jsonschema/1-0-2"
           ),
-        Path.of("vendor1", "name1", "jsonschema", "2") -> List(
+        Paths.get("vendor1", "name1", "jsonschema", "2") -> List(
             "iglu:vendor1/name1/jsonschema/2-0-0",
             "iglu:vendor1/name1/jsonschema/2-1-0",
             "iglu:vendor1/name1/jsonschema/2-2-0",

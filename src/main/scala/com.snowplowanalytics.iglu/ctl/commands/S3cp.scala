@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2012-2022 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -14,8 +14,8 @@ package com.snowplowanalytics.iglu.ctl
 package commands
 
 import java.nio.file.Path
-
-import cats.data.{ EitherT, NonEmptyList }
+import java.nio.file.Paths
+import cats.data.{EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 import io.circe.Json
@@ -47,7 +47,7 @@ object S3cp {
       s3    <- getS3(accessKeyId, secretAccessKey, profile, region).leftMap(NonEmptyList.of(_))
       files <- EitherT(File.readSchemas(inputDir).map(Common.leftBiasedIor))
       _     <- files.toList.traverse { file =>
-        val key = fileToS3Path(Path.of(file.content.self.schemaKey.toPath), pathPrefix)
+        val key = fileToS3Path(Paths.get(file.content.self.schemaKey.toPath), pathPrefix)
         upload(file.content.normalize, key, s3, bucketName)
           .flatMap(url => log(s"File [${file.path.toAbsolutePath}] uploaded as [$url]"))
       }.leftMap(NonEmptyList.of(_))
@@ -98,7 +98,7 @@ object S3cp {
         log(s"No schema list for $vendor/$name/$model because order is unambiguous")
       }.as {
         unambiguous.map { case ((vendor, name, model), schemaKeys) =>
-          Path.of(vendor, name, "jsonschema", model.toString) -> schemaKeys.map(_.toSchemaUri).sorted
+          Paths.get(vendor, name, "jsonschema", model.toString) -> schemaKeys.map(_.toSchemaUri).sorted
         }.toMap
       }.leftMap(NonEmptyList.of(_))
   }
@@ -140,7 +140,7 @@ object S3cp {
                        pathPrefix: Option[String],
                        bucketName: String,
                        s3: S3Client): FailingNel[Unit] = {
-    val key = fileToS3Path(Path.of(""), pathPrefix)
+    val key = fileToS3Path(Paths.get(""), pathPrefix)
     upload(Json.fromValues(modelLists.toList.flatMap(_._2).map(Json.fromString(_))), key, s3, bucketName)
       .flatMap(url => log(s"Schema list uploaded as [$url]"))
       .leftMap(NonEmptyList.of(_))
@@ -176,5 +176,8 @@ object S3cp {
     * @return full S3 path
     */
   def fileToS3Path(file: Path, customPrefix: Option[String]): String =
-    Path.of(customPrefix.getOrElse("")).resolve(Path.of("schemas")).resolve(file).asScala.mkString("/")
+    Paths.get(customPrefix.getOrElse(""))
+      .resolve(Paths.get("schemas"))
+      .resolve(file)
+      .asScala.mkString("/")
 }

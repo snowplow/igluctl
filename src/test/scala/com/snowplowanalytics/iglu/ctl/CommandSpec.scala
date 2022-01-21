@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 Snowplow Analytics Ltd. All rights reserved.
+ * Copyright (c) 2012-2022 Snowplow Analytics Ltd. All rights reserved.
  *
  * This program is licensed to you under the Apache License Version 2.0,
  * and you may not use this file except in compliance with the Apache License Version 2.0.
@@ -16,14 +16,11 @@ package com.snowplowanalytics.iglu.ctl
 import java.nio.file.Paths
 import java.util.UUID
 
-// cats
-import cats.syntax.either._
-
 // decline
 import com.monovore.decline.Help
 
 // Schema DDL
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter.{ unknownFormats, rootObject, allLintersMap }
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter.{ unknownFormats, rootObject}
 
 // specs2
 import org.specs2.Specification
