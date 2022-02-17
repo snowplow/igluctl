@@ -67,7 +67,7 @@ object Command {
   val varcharSize = Opts.option[Int]("varchar-size", "Default size for varchar data type", metavar = "n").withDefault(4096)
   val withJsonPathsOpt = Opts.flag("with-json-paths", "Produce JSON Paths files with DDL").orFalse
   val rawMode = Opts.flag("raw-mode", "Produce raw DDL without Snowplow-specific data").orFalse
-  val splitProduct = Opts.flag("raw-mode", "Split product types (e.g. [string,integer]) into separate columns").orFalse
+  val splitProduct = Opts.flag("split-product", "Split product types (e.g. [string,integer]) into separate columns").orFalse
   val noHeader = Opts.flag("no-header", "Do not place header comments into output DDL").orFalse
   val force = Opts.flag("force", "Force override existing manually-edited files").orFalse
 
