@@ -33,8 +33,12 @@ case class Storage[F[_]](xa: Transactor[F]) {
   }
 
   def getComment(tableName: String, tableSchema: String)(implicit F: Bracket[F, Throwable]) =
-    fr"SELECT oid, obj_description(oid) AS comment FROM pg_class WHERE relname = $tableName"
-      .query[Storage.Comment].option.transact(xa)
+    (
+      fr"SELECT C.oid, obj_description(C.oid) AS comment" ++
+        fr"FROM pg_class" ++
+        fr"C LEFT JOIN pg_namespace N ON N.oid = C.relnamespace" ++
+        fr"WHERE C.relname = $tableName AND trim(N.nspname) = $tableSchema"
+      ).query[Storage.Comment].option.transact(xa)
 }
 
 object Storage {
