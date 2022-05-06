@@ -67,7 +67,6 @@ object Command {
   val varcharSize = Opts.option[Int]("varchar-size", "Default size for varchar data type", metavar = "n").withDefault(4096)
   val withJsonPathsOpt = Opts.flag("with-json-paths", "Produce JSON Paths files with DDL").orFalse
   val rawMode = Opts.flag("raw-mode", "Produce raw DDL without Snowplow-specific data").orFalse
-  val splitProduct = Opts.flag("raw-mode", "Split product types (e.g. [string,integer]) into separate columns").orFalse
   val noHeader = Opts.flag("no-header", "Do not place header comments into output DDL").orFalse
   val force = Opts.flag("force", "Force override existing manually-edited files").orFalse
 
@@ -128,7 +127,7 @@ object Command {
 
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
-    (input, output.orNone, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, splitProduct, noHeader, force).mapN(StaticGenerate.apply)
+    (input, output.orNone, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, noHeader, force).mapN(StaticGenerate.apply)
   }
   val staticDeploy = Opts.subcommand("deploy", "Master command for schema deployment")(Opts.argument[Path]("config").map(StaticDeploy))
   val staticPush = Opts.subcommand("push", "Upload Schemas from folder onto the Iglu Server") {
@@ -177,7 +176,6 @@ object Command {
                             varcharSize: Int,
                             withJsonPaths: Boolean,
                             rawMode: Boolean,
-                            splitProduct: Boolean,
                             noHeader: Boolean,
                             force: Boolean) extends StaticCommand
   case class StaticDeploy(config: Path) extends StaticCommand
