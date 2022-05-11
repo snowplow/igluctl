@@ -166,7 +166,7 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_1 IS 'iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0';""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(input))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(input))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), expectedDdl)),
       Nil, Nil, Nil
@@ -286,7 +286,7 @@ class GenerateSpec extends Specification { def is = s2"""
         }
       """.schema
 
-    val output = Generate.transform(false, "atomic", 128, false, true, None, true)(NonEmptyList.of(input))
+    val output = Generate.transform(false, "atomic", 128, true, None, true)(NonEmptyList.of(input))
     val expected = List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), resultContent))
 
     output.ddls must beEqualTo(expected)
@@ -403,7 +403,7 @@ class GenerateSpec extends Specification { def is = s2"""
            "additionalProperties" : false
          }""".schema
 
-    val output = Generate.transform(false, "snowplow", 4096, false, true, None, false)(NonEmptyList.of(input))
+    val output = Generate.transform(false, "snowplow", 4096, true, None, false)(NonEmptyList.of(input))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.amazon.aws.ec2/instance_identity_document_1.sql"), resultContent)),
       Nil, Nil, Nil
@@ -552,7 +552,7 @@ class GenerateSpec extends Specification { def is = s2"""
          |    ]
          |}""".stripMargin
 
-    val output = Generate.transform(true, "atomic", 4096, false, false, None, false)(NonEmptyList.of(input)).jsonPaths.head
+    val output = Generate.transform(true, "atomic", 4096, false, None, false)(NonEmptyList.of(input)).jsonPaths.head
 
     val expected = textFile(Paths.get("com.amazon.aws.cloudfront/wd_access_log_1.json"), resultContent)
 
@@ -657,7 +657,7 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |ALTER TABLE atomic.com_acme_persons_simple_1 OWNER TO storageloader;""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, Some("storageloader"), true)(NonEmptyList.of(input))
+    val output = Generate.transform(false, "atomic", 4096, true, Some("storageloader"), true)(NonEmptyList.of(input))
 
     val expected = List(textFile(Paths.get("com.acme.persons/simple_1.sql"), resultContent))
 
@@ -748,7 +748,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |END TRANSACTION;""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(initial, second))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(initial, second))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)),
       List(textFile(Paths.get("com.acme/example/1-0-0/1-0-1.sql"), expectedMigration)),
@@ -1067,7 +1067,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |END TRANSACTION;""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(initial, second, third))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(initial, second, third))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)),
       List(
@@ -1136,7 +1136,7 @@ class GenerateSpec extends Specification { def is = s2"""
 
     val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1198,7 +1198,7 @@ class GenerateSpec extends Specification { def is = s2"""
 
     val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1246,7 +1246,7 @@ class GenerateSpec extends Specification { def is = s2"""
 
     val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1289,7 +1289,7 @@ class GenerateSpec extends Specification { def is = s2"""
 
     val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1347,7 +1347,7 @@ class GenerateSpec extends Specification { def is = s2"""
         }
       """.schema
 
-    val output = Generate.transform(false, "atomic", 4096, false, true, None, false)(NonEmptyList.of(input1, input2))
+    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(input1, input2))
 
     val expectedWarning = "Gap in the following model group schemas, NonEmptyList(SchemaKey(com.amazon.aws.lambda,java_context,jsonschema,Full(1,0,0)), SchemaKey(com.amazon.aws.lambda,java_context,jsonschema,Full(1,0,2)))"
 

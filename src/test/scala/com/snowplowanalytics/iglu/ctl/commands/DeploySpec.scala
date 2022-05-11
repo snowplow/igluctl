@@ -71,7 +71,7 @@ class DeploySpec extends Specification { def is = s2"""
       ),
       Command.StaticGenerate(
         inputPath, Some(outputPath), "atomic", Some("a_new_owner"), 4096, true,
-        false, false, false, false
+        false, false, false
       ),
       List(
         IgluctlAction.Push(Command.StaticPush(

@@ -50,7 +50,6 @@ object Generate {
               rawMode: Boolean,
               dbSchema: String,
               varcharSize: Int,
-              splitProduct: Boolean,
               noHeader: Boolean,
               force: Boolean,
               owner: Option[String]): Result = {
@@ -62,7 +61,7 @@ object Generate {
       schemaFiles <- EitherT(File.readSchemas(input).map(Common.leftBiasedIor))
       igluSchemas = parseSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       schemas     <- EitherT.fromEither[IO](igluSchemas)
-      result      = transform(withJsonPaths, dbSchema, varcharSize, splitProduct, noHeader, owner, rawMode)(schemas)
+      result      = transform(withJsonPaths, dbSchema, varcharSize, noHeader, owner, rawMode)(schemas)
       messages    <- EitherT(outputResult(output, result, force))
     } yield messages
   }
@@ -182,7 +181,6 @@ object Generate {
   private[ctl] def transform(withJsonPaths: Boolean,
                              dbSchema: String,
                              varcharSize: Int,
-                             splitProduct: Boolean,
                              noHeader: Boolean,
                              owner: Option[String],
                              rawMode: Boolean)

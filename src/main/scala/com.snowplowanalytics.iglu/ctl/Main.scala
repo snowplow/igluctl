@@ -52,8 +52,8 @@ object Main extends IOApp {
       case Right(Command.Lint(input, skipWarnings, skipChecks)) =>
         Lint.process(input, skipChecks, skipWarnings)
 
-      case Right(Command.StaticGenerate(in, out, schema, own, size, jp, raw, split, noheader, f)) =>
-        Generate.process(in, out, jp, raw, schema, size, split, noheader, f, own)
+      case Right(Command.StaticGenerate(in, out, schema, own, size, jp, raw, noheader, f)) =>
+        Generate.process(in, out, jp, raw, schema, size, noheader, f, own)
       case Right(Command.StaticPush(input, registryRoot, apikey, public, legacy)) =>
         Push.process(input, registryRoot, apikey, public, legacy)
       case Right(Command.StaticPull(output, registryRoot, apikey)) =>

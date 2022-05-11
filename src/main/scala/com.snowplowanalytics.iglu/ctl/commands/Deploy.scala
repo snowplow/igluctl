@@ -47,7 +47,7 @@ object Deploy {
       output       <- Lint.process(cfg.lint.input, cfg.lint.skipChecks, cfg.lint.skipWarnings)
       _            <- Generate.process(cfg.generate.input,
         cfg.generate.output, cfg.generate.withJsonPaths, cfg.generate.rawMode,
-        cfg.generate.dbSchema, cfg.generate.varcharSize, cfg.generate.splitProduct,
+        cfg.generate.dbSchema, cfg.generate.varcharSize,
         cfg.generate.noHeader, cfg.generate.force, cfg.generate.owner)
       actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], *], List[String]](_.process)
     } yield output ::: actionsOut.flatten
@@ -134,7 +134,7 @@ object Deploy {
         owner         <- cursor.downField("owner").as[String]
       } yield Command.StaticGenerate(
         tempPath, Some(output), dbSchema, Some(owner),
-        varcharSize, withJsonPaths, false, false, noHeader, force
+        varcharSize, withJsonPaths, false, noHeader, force
       )
     }
 
