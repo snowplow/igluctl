@@ -44,7 +44,7 @@ object Deploy {
     for {
       configDoc    <- EitherT(readFile(configFile)).leftMap(NonEmptyList.of(_))
       cfg          <- EitherT.fromEither[IO](parseConfig(configDoc.content)).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e)))
-      output       <- Lint.process(cfg.lint.input, cfg.lint.skipChecks)
+      output       <- Lint.process(cfg.lint.input, cfg.lint.skipChecks, cfg.lint.skipSchemas)
       _            <- Generate.process(cfg.generate.input,
         cfg.generate.output, cfg.generate.withJsonPaths, cfg.generate.rawMode,
         cfg.generate.dbSchema, cfg.generate.varcharSize,
@@ -117,8 +117,10 @@ object Deploy {
     Decoder.instance { cursor =>
       for {
         includedChecks <- cursor.downField("includedChecks").as[List[String]]
+        skippedSchemas <- cursor.downField("skippedSchemas").as[List[String]]
         linters <- Lint.parseOptionalLinters(includedChecks.mkString(",")).leftMap(e => DecodingFailure(e.toString, Nil))
-      } yield Command.Lint(tempPath, linters)
+        schemas <- Lint.parseSkippedSchemas(skippedSchemas.mkString(",")).leftMap(e => DecodingFailure(e.toString, Nil))
+      } yield Command.Lint(tempPath, linters, schemas)
     }
 
   implicit val generateConfigDecoder: Decoder[Command.StaticGenerate] =
