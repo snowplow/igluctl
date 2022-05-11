@@ -95,7 +95,7 @@ object S3cp {
         .partition { case (k, schemaKeys) => noAmbiguity(schemaKeys.map(_.version)) }
 
       ambiguous.traverse { case ((vendor, name, model), _) =>
-        log(s"No schema list for $vendor/$name/$model because order is unambiguous")
+        log(s"No schema list for $vendor/$name/$model because order is ambiguous")
       }.as {
         unambiguous.map { case ((vendor, name, model), schemaKeys) =>
           Paths.get(vendor, name, "jsonschema", model.toString) -> schemaKeys.map(_.toSchemaUri).sorted
