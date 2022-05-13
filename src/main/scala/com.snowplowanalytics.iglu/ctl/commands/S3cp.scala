@@ -160,7 +160,7 @@ object S3cp {
   def upload(json: Json, path: String, service: S3Client, bucketName: String): EitherT[IO, Error, String] = {
     EitherT(IO {
       val content = RequestBody.fromString(json.noSpaces)
-      service.putObject(PutObjectRequest.builder.bucket(bucketName).key(path).build, content)
+      service.putObject(PutObjectRequest.builder.bucket(bucketName).key(path).contentType("application/json; charset=utf-8").build, content)
       s"s3://$bucketName/$path"
     }.attemptNarrow[SdkException]).leftMap {
         case e: SdkException => Error.ServiceError(e.toString)
