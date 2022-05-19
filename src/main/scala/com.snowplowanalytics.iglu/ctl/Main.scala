@@ -49,8 +49,8 @@ object Main extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
     val result: Result = Command.parse(args) match {
-      case Right(Command.Lint(input, skipWarnings, skipChecks)) =>
-        Lint.process(input, skipChecks, skipWarnings)
+      case Right(Command.Lint(input, skipChecks)) =>
+        Lint.process(input, skipChecks)
 
       case Right(Command.StaticGenerate(in, out, schema, own, size, jp, raw, noheader, f)) =>
         Generate.process(in, out, jp, raw, schema, size, noheader, f, own)

@@ -33,7 +33,6 @@ class DeploySpec extends Specification { def is = s2"""
       {
         "input": "file:///input/path",
         "lint": {
-            "skipWarnings": true,
             "includedChecks": ["rootObject", "unknownFormats"]
         },
         "generate": {
@@ -67,7 +66,7 @@ class DeploySpec extends Specification { def is = s2"""
     val expected = IgluctlConfig(
       None,
       Command.Lint(
-        inputPath, true, List(Linter.unknownFormats, Linter.rootObject)
+        inputPath, List(Linter.unknownFormats, Linter.rootObject)
       ),
       Command.StaticGenerate(
         inputPath, Some(outputPath), "atomic", Some("a_new_owner"), 4096, true,
