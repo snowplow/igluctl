@@ -96,7 +96,6 @@ object Command {
     "optionalNull         - Check that non-required fields have null type\n" +
     "stringMaxLengthRange - Check that possible VARCHAR is in acceptable limits for Redshift\n" +
     "description          - Check that property contains description"
-  val skipWarnings = Opts.flag("skip-warnings", "Don't output messages with log level less than ERROR").orFalse
   val skipChecks = Opts.option[List[Linter]]("skip-checks", s"Lint without specified linters, given comma separated\n$lintersListText").withDefault(List.empty)
 
   // server keygen options
@@ -146,7 +145,7 @@ object Command {
     staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull)
   }
   val lint = Opts.subcommand("lint", "Validate JSON schemas") {
-    (input, skipWarnings, skipChecks).mapN(Lint.apply)
+    (input, skipChecks).mapN(Lint.apply)
   }
   val server = Opts.subcommand("server", "Communication with Iglu Server") {
     serverKeygen
@@ -197,7 +196,6 @@ object Command {
                         skipSchemaLists: Boolean) extends StaticCommand
 
   case class Lint(input: Path,
-                  skipWarnings: Boolean,
                   skipChecks: List[Linter]) extends IgluctlCommand
 
   case class ServerKeygen(server: Server.HttpUrl, masterKey: UUID, vendorPrefix: Server.VendorPrefix) extends IgluctlCommand

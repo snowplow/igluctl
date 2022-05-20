@@ -5,8 +5,6 @@
 
     // Configuration for lint command
     "lint": {
-      // Don't output messages with log level less than ERROR
-      "skipWarnings": true
 
       // Lint using the provided linters
       "includedChecks": [

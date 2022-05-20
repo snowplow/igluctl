@@ -40,7 +40,7 @@ class CommandSpec extends Specification { def is = s2"""
   def e1 = {
     val lint = Command.parse("lint .".split(" ").toList)
 
-    lint must beRight(Command.Lint(Paths.get("."), false, List.empty))
+    lint must beRight(Command.Lint(Paths.get("."), List.empty))
   }
 
   def e2 = {
@@ -62,7 +62,7 @@ class CommandSpec extends Specification { def is = s2"""
 
     val skippedChecks = List(unknownFormats, rootObject)
 
-    lint must beRight(Command.Lint(Paths.get("."), false, skippedChecks))
+    lint must beRight(Command.Lint(Paths.get("."), skippedChecks))
   }
 
   def e5 = {

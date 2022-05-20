@@ -42,18 +42,17 @@ object Lint {
     * Primary method running command logic
     * @param input path to a directory or single schema
     * @param lintersToSkip list of linters that should *NOT* be used
-    * @param skipWarnings whether metaschema's warning should be considered (e.g. unknown format)
     *
     * Read: filter out, but do not short-circuit the process in case of
     * inaccessible file, invalid JSON, invalid Schema. Do not load into memory
     * Lint: do not filter out, do not short-circuit just collect warnings
     * Return: amount of warnings, amount of files
     */
-  def process(input: Path, lintersToSkip: List[Linter], skipWarnings: Boolean): Result = {
+  def process(input: Path, lintersToSkip: List[Linter]): Result = {
     val lintersToUse = skipLinters(lintersToSkip)
     val result = for {
       consistentSchemas <- File.readSchemas(input)
-      reports  = consistentSchemas.map(schemas => schemas.map(_.content).map(check(lintersToUse, skipWarnings)))
+      reports  = consistentSchemas.map(schemas => schemas.map(_.content).map(check(lintersToUse)))
     } yield prepareReports(reports)
     EitherT(result)
   }
@@ -90,7 +89,7 @@ object Lint {
     * @param schema a JSON schema with validated correct underlying FS path
     * @return [[Report]] ADT, indicating successful lint or containing errors
     */
-  def check(linters: List[Linter], skipWarnings: Boolean)(schema: SelfDescribingSchema[Json]): Either[SchemaFailure, String] = {
+  def check(linters: List[Linter])(schema: SelfDescribingSchema[Json]): Either[SchemaFailure, String] = {
     val syntaxCheck = CirceValidator.checkSchema(schema.schema).map(e => s"Could not validate the schema, path: ${e.path}, message: ${e.message}") match {
       case Nil => Valid[Unit](())
       case e => Invalid(NonEmptyList.fromListUnsafe(e))
