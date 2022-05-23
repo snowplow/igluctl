@@ -12,10 +12,12 @@
  */
 package com.snowplowanalytics.iglu.ctl.commands
 
+import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.SchemaVer.Full
+
 import java.nio.file.Paths
 import java.net.URI
 import java.util.UUID
-
 import io.circe.literal._
 import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction
 import com.snowplowanalytics.iglu.ctl.commands.Deploy._
@@ -33,7 +35,10 @@ class DeploySpec extends Specification { def is = s2"""
       {
         "input": "file:///input/path",
         "lint": {
-            "includedChecks": ["rootObject", "unknownFormats"]
+            "includedChecks": ["rootObject", "unknownFormats"],
+            "skippedSchemas": [
+              "iglu:com.acme/click/jsonschema/1-0-1"
+            ]
         },
         "generate": {
             "output": "file:///output/path",
@@ -66,7 +71,7 @@ class DeploySpec extends Specification { def is = s2"""
     val expected = IgluctlConfig(
       None,
       Command.Lint(
-        inputPath, List(Linter.unknownFormats, Linter.rootObject)
+        inputPath, List(Linter.unknownFormats, Linter.rootObject), List(SchemaKey("com.acme", "click", "jsonschema", Full(1,0,1)))
       ),
       Command.StaticGenerate(
         inputPath, Some(outputPath), "atomic", Some("a_new_owner"), 4096, true,

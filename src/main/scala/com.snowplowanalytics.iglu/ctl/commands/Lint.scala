@@ -13,22 +13,19 @@
 package com.snowplowanalytics.iglu.ctl
 package commands
 
-import java.nio.file.Path
-
+import cats.data.Validated.{Invalid, Valid}
+import cats.data._
 import cats.implicits._
-import cats.data.{EitherT, NonEmptyList, Ior, IorNel, EitherNel}
-import cats.data.Validated.{Valid, Invalid}
-
-import com.snowplowanalytics.iglu.core.SelfDescribingSchema
-import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.SanityLinter.{ lint, Report => LinterReport }
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.{Linter, Schema}
-import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 import com.snowplowanalytics.iglu.client.validator.CirceValidator
-
+import com.snowplowanalytics.iglu.core.circe.implicits._
+import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.ctl.Common.Error
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.SanityLinter.{lint, Report => LinterReport}
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
+import com.snowplowanalytics.iglu.schemaddl.jsonschema.{Linter, Schema}
 import io.circe._
 
-import com.snowplowanalytics.iglu.ctl.Common.Error
+import java.nio.file.Path
 
 object Lint {
 
@@ -42,20 +39,23 @@ object Lint {
     * Primary method running command logic
     * @param input path to a directory or single schema
     * @param lintersToSkip list of linters that should *NOT* be used
+    * @param schemasToSkip list of schemas that should *NOT* be linted
     *
     * Read: filter out, but do not short-circuit the process in case of
     * inaccessible file, invalid JSON, invalid Schema. Do not load into memory
     * Lint: do not filter out, do not short-circuit just collect warnings
     * Return: amount of warnings, amount of files
     */
-  def process(input: Path, lintersToSkip: List[Linter]): Result = {
+  def process(input: Path, lintersToSkip: List[Linter], schemasToSkip: List[SchemaKey]): Result = {
     val lintersToUse = skipLinters(lintersToSkip)
     val result = for {
       consistentSchemas <- File.readSchemas(input)
-      reports  = consistentSchemas.map(schemas => schemas.map(_.content).map(check(lintersToUse)))
+      unskippedSchemas = skipSchemas(schemasToSkip, consistentSchemas)
+      reports = unskippedSchemas.map(schemas => schemas.map(_.content).map(check(lintersToUse)))
     } yield prepareReports(reports)
     EitherT(result)
   }
+
 
   /**
     *
@@ -126,6 +126,16 @@ object Lint {
       .values
       .toList
 
+  /** Get schemas that weren't skipped via --skip-schemas */
+  def skipSchemas(toSkip: List[SchemaKey], schemasOrError: IorNel[Error, NonEmptyList[SchemaFile]]): IorNel[Error, NonEmptyList[SchemaFile]] = {
+    schemasOrError.flatMap { schemas =>
+      NonEmptyList.fromList(schemas.filterNot(schema => toSkip.contains(schema.content.self.schemaKey))) match {
+        case Some(schemas) => Ior.right(schemas)
+        case None => Ior.Left(NonEmptyList(Error.Message("All schemas provided were also skipped"), Nil))
+      }
+    }
+  }
+
   /**
     * Validates if user provided --skip-checks with a valid string
     * @param lintersString command line input for --skip-checks
@@ -135,6 +145,16 @@ object Lint {
     validateOptionalLinters(lintersString).map { toInclude =>
       Linter.allLintersMap.filterKeys(toInclude.contains).values.toList
     }.leftMap(error => Error.ConfigParseError(error))
+
+  /**
+    * Validates if user provided --skip-schemas with a valid string
+    * @param schemasString command line input for --skip-schemas
+    * @return Either error concatenated error messages or valid list of SchemaKey
+    */
+  def parseSkippedSchemas(schemasString: String): Either[Error, List[SchemaKey]] = {
+    val schemas: List[Either[String, SchemaKey]] = schemasString.split(',').toList.map(SchemaKey.fromUri(_).leftMap(_.code))
+    schemas.sequence.leftMap((msg: String) => Error.Message(s"$msg - check schema are comma separated in iglu:<URI1>,iglu:<URI2> format"))
+  }
 
   /** Check that comma-separated list passed by --skip-checks is list of optional linters */
   def validateOptionalLinters(string: String): Either[String, List[String]] = {

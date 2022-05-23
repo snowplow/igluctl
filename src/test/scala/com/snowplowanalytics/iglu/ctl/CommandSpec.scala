@@ -13,6 +13,9 @@
 package com.snowplowanalytics.iglu.ctl
 
 // java
+import com.snowplowanalytics.iglu.core.SchemaKey
+import com.snowplowanalytics.iglu.core.SchemaVer.Full
+
 import java.nio.file.Paths
 import java.util.UUID
 
@@ -35,12 +38,13 @@ class CommandSpec extends Specification { def is = s2"""
     fails to extract lint with unskippable checks specified $e5
     extracts static pull command class when apikey is not given $e6
     extracts static pull command class when apikey is given $e7
+    extracts lint command class (--skip-schemas) $e8
   """
 
   def e1 = {
     val lint = Command.parse("lint .".split(" ").toList)
 
-    lint must beRight(Command.Lint(Paths.get("."), List.empty))
+    lint must beRight(Command.Lint(Paths.get("."), List.empty, List.empty))
   }
 
   def e2 = {
@@ -62,7 +66,7 @@ class CommandSpec extends Specification { def is = s2"""
 
     val skippedChecks = List(unknownFormats, rootObject)
 
-    lint must beRight(Command.Lint(Paths.get("."), skippedChecks))
+    lint must beRight(Command.Lint(Paths.get("."), skippedChecks, List.empty))
   }
 
   def e5 = {
@@ -86,5 +90,13 @@ class CommandSpec extends Specification { def is = s2"""
     val url = Server.HttpUrl.parse("http://54.165.217.26:8081/").getOrElse(throw new RuntimeException("Invalid URI"))
 
     staticPull must beRight(Command.StaticPull(Paths.get(".."), url, None))
+  }
+
+  def e8 = {
+    val lint = Command.parse("lint . --skip-schemas iglu:com.pagerduty/incident/jsonschema/1-0-0,iglu:com.mparticle.snowplow/app_event/jsonschema/1-0-0".split(" ").toList)
+
+    val skippedSchemas = List(SchemaKey("com.pagerduty", "incident", "jsonschema", Full(1,0,0)), SchemaKey("com.mparticle.snowplow", "app_event", "jsonschema", Full(1,0,0)))
+
+    lint must beRight(Command.Lint(Paths.get("."), List.empty, skippedSchemas))
   }
 }

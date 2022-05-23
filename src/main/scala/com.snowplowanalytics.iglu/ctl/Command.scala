@@ -45,6 +45,12 @@ object Command {
     def defaultMetavar: String = "linters"
   }
 
+  implicit val readSchemas: Argument[List[SchemaKey]] = new Argument[List[SchemaKey]] {
+    def read(string: String): ValidatedNel[String, List[SchemaKey]] =
+      commands.Lint.parseSkippedSchemas(string).leftMap(_.show).toValidatedNel
+    def defaultMetavar: String = "schemaKeys"
+  }
+
   implicit val readRegistryRoot: Argument[Server.HttpUrl] = new Argument[Server.HttpUrl] {
     def read(string: String): ValidatedNel[String, Server.HttpUrl] =
       Server.HttpUrl.parse(string).leftMap(_.show).toValidatedNel
@@ -96,7 +102,8 @@ object Command {
     "optionalNull         - Check that non-required fields have null type\n" +
     "stringMaxLengthRange - Check that possible VARCHAR is in acceptable limits for Redshift\n" +
     "description          - Check that property contains description"
-  val skipChecks = Opts.option[List[Linter]]("skip-checks", s"Lint without specified linters, given comma separated\n$lintersListText").withDefault(List.empty)
+  val skipChecks: Opts[List[Linter]] = Opts.option[List[Linter]]("skip-checks", s"Lint without specified linters, given comma separated\n$lintersListText").withDefault(List.empty)
+  val skipSchemas: Opts[List[SchemaKey]] = Opts.option[List[SchemaKey]]("skip-schemas", s"Lint skipping specified schemas, given comma separated schemas with iglu:<URI> format").withDefault(List.empty)
 
   // server keygen options
   val vendorPrefix = Opts.option[String]("vendor-prefix", "Vendor prefix to associate with generated key")
@@ -145,7 +152,7 @@ object Command {
     staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull)
   }
   val lint = Opts.subcommand("lint", "Validate JSON schemas") {
-    (input, skipChecks).mapN(Lint.apply)
+    (input, skipChecks, skipSchemas).mapN(Lint.apply)
   }
   val server = Opts.subcommand("server", "Communication with Iglu Server") {
     serverKeygen
@@ -196,7 +203,9 @@ object Command {
                         skipSchemaLists: Boolean) extends StaticCommand
 
   case class Lint(input: Path,
-                  skipChecks: List[Linter]) extends IgluctlCommand
+                  skipChecks: List[Linter],
+                  skipSchemas: List[SchemaKey]
+                 ) extends IgluctlCommand
 
   case class ServerKeygen(server: Server.HttpUrl, masterKey: UUID, vendorPrefix: Server.VendorPrefix) extends IgluctlCommand
 
