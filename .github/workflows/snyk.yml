@@ -2,7 +2,9 @@ name: Snyk
 
 on:
   push:
-    branches: [ master ]
+    branches:
+      - master
+      - develop
 
 jobs:
   security:
