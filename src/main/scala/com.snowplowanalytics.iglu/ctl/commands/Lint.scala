@@ -19,13 +19,12 @@ import cats.implicits._
 import com.snowplowanalytics.iglu.client.validator.CirceValidator
 import com.snowplowanalytics.iglu.core.circe.implicits._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.ctl.Command
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.SanityLinter.{lint, Report => LinterReport}
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.{Linter, Schema}
 import io.circe._
-
-import java.nio.file.Path
 
 object Lint {
 
@@ -46,11 +45,11 @@ object Lint {
     * Lint: do not filter out, do not short-circuit just collect warnings
     * Return: amount of warnings, amount of files
     */
-  def process(input: Path, lintersToSkip: List[Linter], schemasToSkip: List[SchemaKey]): Result = {
-    val lintersToUse = skipLinters(lintersToSkip)
+  def process(command: Command.Lint): Result = {
+    val lintersToUse = skipLinters(command.skipChecks)
     val result = for {
-      consistentSchemas <- File.readSchemas(input)
-      unskippedSchemas = skipSchemas(schemasToSkip, consistentSchemas)
+      consistentSchemas <- File.readSchemas(command.input)
+      unskippedSchemas = skipSchemas(command.skipSchemas, consistentSchemas)
       reports = unskippedSchemas.map(schemas => schemas.map(_.content).map(check(lintersToUse)))
     } yield prepareReports(reports)
     EitherT(result)

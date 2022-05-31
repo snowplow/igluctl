@@ -35,6 +35,7 @@ import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 
 import com.snowplowanalytics.iglu.ctl.File.textFile
 import com.snowplowanalytics.iglu.ctl.Common.Error
+import com.snowplowanalytics.iglu.ctl.Command.StaticGenerate
 
 object Generate {
 
@@ -44,25 +45,17 @@ object Generate {
     * convert to [[DdlOutput]] (combined table definition, JSON Paths, etc)
     * and output them to specified path, also output errors
     */
-  def process(input: Path,
-              optOutput: Option[Path],
-              withJsonPaths: Boolean,
-              rawMode: Boolean,
-              dbSchema: String,
-              varcharSize: Int,
-              noHeader: Boolean,
-              force: Boolean,
-              owner: Option[String]): Result = {
+  def process(command: StaticGenerate): Result = {
 
-    val output = getOutput(optOutput)
+    val output = getOutput(command.output)
 
     for {
       _           <- File.checkOutput(output)
-      schemaFiles <- EitherT(File.readSchemas(input).map(Common.leftBiasedIor))
+      schemaFiles <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
       igluSchemas = parseSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       schemas     <- EitherT.fromEither[IO](igluSchemas)
-      result      = transform(withJsonPaths, dbSchema, varcharSize, noHeader, owner, rawMode)(schemas)
-      messages    <- EitherT(outputResult(output, result, force))
+      result      = transform(command.withJsonPaths, command.dbSchema, command.varcharSize, command.noHeader, command.owner, command.rawMode)(schemas)
+      messages    <- EitherT(outputResult(output, result, command.force))
     } yield messages
   }
 

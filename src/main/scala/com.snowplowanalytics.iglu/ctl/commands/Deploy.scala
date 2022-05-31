@@ -21,7 +21,7 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect._
 import cats.implicits._
 
-import com.typesafe.config.{Config => RawConfig, ConfigFactory}
+import com.typesafe.config.{ConfigFactory, Config => RawConfig}
 
 import io.circe._
 import io.circe.config.parser
@@ -30,6 +30,9 @@ import com.snowplowanalytics.iglu.ctl.File.readFile
 import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.commands.Deploy.ApiKeySecret.EnvVar
+import com.snowplowanalytics.iglu.ctl.Command.StaticDeploy
+
+import org.http4s.client.Client
 
 object Deploy {
 
@@ -40,16 +43,13 @@ object Deploy {
     * Performs usual schema workflow at once, per configuration file
     * Short-circuits on first failed step
     */
-  def process(configFile: Path): Result = {
+  def process(command: StaticDeploy, client: Client[IO]): Result = {
     for {
-      configDoc    <- EitherT(readFile(configFile)).leftMap(NonEmptyList.of(_))
+      configDoc    <- EitherT(readFile(command.config)).leftMap(NonEmptyList.of(_))
       cfg          <- EitherT.fromEither[IO](parseConfig(configDoc.content)).leftMap(e => NonEmptyList.of(Error.ConfigParseError(e)))
-      output       <- Lint.process(cfg.lint.input, cfg.lint.skipChecks, cfg.lint.skipSchemas)
-      _            <- Generate.process(cfg.generate.input,
-        cfg.generate.output, cfg.generate.withJsonPaths, cfg.generate.rawMode,
-        cfg.generate.dbSchema, cfg.generate.varcharSize,
-        cfg.generate.noHeader, cfg.generate.force, cfg.generate.owner)
-      actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], *], List[String]](_.process)
+      output       <- Lint.process(cfg.lint)
+      _            <- Generate.process(cfg.generate)
+      actionsOut   <- cfg.actions.traverse[EitherT[IO, NonEmptyList[Common.Error], *], List[String]](IgluctlConfig.process(client, _))
     } yield output ::: actionsOut.flatten
   }
 

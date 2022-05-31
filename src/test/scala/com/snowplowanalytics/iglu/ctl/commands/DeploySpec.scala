@@ -23,6 +23,7 @@ import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction
 import com.snowplowanalytics.iglu.ctl.commands.Deploy._
 import com.snowplowanalytics.iglu.ctl.{Command, IgluctlConfig, Server}
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Linter
+import org.http4s.implicits._
 import org.specs2.Specification
 
 class DeploySpec extends Specification { def is = s2"""
@@ -79,7 +80,7 @@ class DeploySpec extends Specification { def is = s2"""
       ),
       List(
         IgluctlAction.Push(Command.StaticPush(
-          inputPath, Server.HttpUrl(URI.create("http://iglu-server.com")),
+          inputPath, Server.HttpUrl(uri"http://iglu-server.com"),
           UUID.fromString("79f28002-aadc-4bdf-bd79-7209f28873b9"),
           true,
           false

@@ -12,14 +12,15 @@
  */
 package com.snowplowanalytics.iglu.ctl.commands
 
-import java.util.UUID
-
 import cats.data.NonEmptyList
+import cats.effect.IO
+import com.snowplowanalytics.iglu.ctl.Command.ServerKeygen
 import com.snowplowanalytics.iglu.ctl.{Result, Server}
+import org.http4s.client.Client
 
 object Keygen {
-  def process(server: Server.HttpUrl, masterKey: UUID, prefix: Server.VendorPrefix): Result =
-    Server.createKeys(server, masterKey, prefix)
+  def process(command: ServerKeygen, httpClient: Client[IO]): Result =
+    Server.createKeys(command.server, command.masterKey, command.vendorPrefix, httpClient)
       .map { case Server.ApiKeys(read, write) => List(s"Read key: $read", s"Write key: $write") }
       .leftMap(error => NonEmptyList.of(error))
 }

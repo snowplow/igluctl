@@ -19,7 +19,6 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 import io.circe.Json
-
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
@@ -28,31 +27,23 @@ import software.amazon.awssdk.auth.credentials.{AwsBasicCredentials, AwsCredenti
 import software.amazon.awssdk.core.exception.SdkException
 
 import scala.jdk.CollectionConverters._
-
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaVer}
 import com.snowplowanalytics.iglu.core.circe.implicits._
-
 import Common.Error
+import com.snowplowanalytics.iglu.ctl.Command.StaticS3Cp
 
 object S3cp {
-  def process(inputDir: Path,
-              bucketName: String,
-              pathPrefix: Option[String],
-              accessKeyId: Option[String],
-              secretAccessKey: Option[String],
-              profile: Option[String],
-              region: Option[String],
-              skipSchemaLists: Boolean): Result =
+  def process(command: StaticS3Cp): Result =
     for {
-      s3    <- getS3(accessKeyId, secretAccessKey, profile, region).leftMap(NonEmptyList.of(_))
-      files <- EitherT(File.readSchemas(inputDir).map(Common.leftBiasedIor))
+      s3    <- getS3(command.accessKeyId, command.secretKeyId, command.profile, command.region).leftMap(NonEmptyList.of(_))
+      files <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
       _     <- files.toList.traverse { file =>
-        val key = fileToS3Path(Paths.get(file.content.self.schemaKey.toPath), pathPrefix)
-        upload(file.content.normalize, key, s3, bucketName)
+        val key = fileToS3Path(Paths.get(file.content.self.schemaKey.toPath), command.s3Path)
+        upload(file.content.normalize, key, s3, command.bucket)
           .flatMap(url => log(s"File [${file.path.toAbsolutePath}] uploaded as [$url]"))
       }.leftMap(NonEmptyList.of(_))
-      _     <- if (skipSchemaLists) EitherT.rightT[IO, NonEmptyList[Common.Error]](Nil)
-                else uploadLists(files.toList, pathPrefix, bucketName, s3)
+      _     <- if (command.skipSchemaLists) EitherT.rightT[IO, NonEmptyList[Common.Error]](Nil)
+                else uploadLists(files.toList, command.s3Path, command.bucket, s3)
     } yield Nil
 
   def getS3(accessKeyId: Option[String],
