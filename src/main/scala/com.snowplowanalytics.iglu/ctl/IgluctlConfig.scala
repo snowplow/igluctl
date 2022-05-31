@@ -12,6 +12,11 @@
  */
 package com.snowplowanalytics.iglu.ctl
 
+import cats.effect.IO
+import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction.S3Cp
+import com.snowplowanalytics.iglu.ctl.IgluctlConfig.IgluctlAction.Push
+import org.http4s.client.Client
+
 /** Common configuration format used for `static deploy` command */
 case class IgluctlConfig(description: Option[String],
                          lint: Command.Lint,
@@ -20,19 +25,16 @@ case class IgluctlConfig(description: Option[String],
 
 object IgluctlConfig {
   /** Trait common to S3cp and Push commands */
-  sealed trait IgluctlAction {
-    def process: Result
+  sealed trait IgluctlAction
+
+  def process(httpClient: Client[IO], config: IgluctlAction): Result = {
+    config match {
+      case S3Cp(command) => commands.S3cp.process(command)
+      case Push(command) => commands.Push.process(command, httpClient)
+    }
   }
-
   object IgluctlAction {
-    case class S3Cp(command: Command.StaticS3Cp) extends IgluctlAction {
-      def process: Result =
-        commands.S3cp.process(command.input, command.bucket, command.s3Path, command.accessKeyId, command.secretKeyId, command.profile, command.region, command.skipSchemaLists)
-    }
-
-    case class Push(command: Command.StaticPush) extends IgluctlAction {
-      def process: Result =
-        commands.Push.process(command.input, command.registryRoot, command.apikey, command.public, command.legacy)
-    }
+    case class S3Cp(command: Command.StaticS3Cp) extends IgluctlAction
+    case class Push(command: Command.StaticPush) extends IgluctlAction
   }
 }

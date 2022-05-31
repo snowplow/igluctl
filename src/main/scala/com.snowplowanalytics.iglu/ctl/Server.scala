@@ -11,27 +11,24 @@
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
 package com.snowplowanalytics.iglu.ctl
-
-import java.net.URI
 import java.util.UUID
-
-import io.circe.{ Decoder, Encoder, Json }
+import io.circe.{Decoder, Encoder, Json}
 import io.circe.jawn.parse
 import io.circe.syntax._
 import io.circe.generic.semiauto._
-
-import scalaj.http.{Http, HttpRequest, HttpResponse}
-
 import Common.Error
-
 import cats.Show
-import cats.data.{ EitherT, Validated }
+import cats.data.EitherT
+import cats.effect.{IO, Resource}
 import cats.syntax.either._
 import cats.syntax.show._
-import cats.effect.{ IO, Resource }
-
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 import com.snowplowanalytics.iglu.core.circe.implicits._
+import com.snowplowanalytics.iglu.ctl.Common.Error.{ServiceError}
+import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
+import org.http4s.client.Client
+import org.http4s.{Header, Headers, Request, Response, Uri, UrlForm}
+import org.http4s.dsl.io.{DELETE, POST, PUT}
 
 /** Common functions and entities for communication with Iglu Server */
 object Server {
@@ -48,7 +45,7 @@ object Server {
   implicit val circeApiKeysDecoder: Decoder[ApiKeys] =
     deriveDecoder[ApiKeys]
 
-  case class HttpUrl(uri: URI) extends AnyVal {
+  case class HttpUrl(uri: Uri) extends AnyVal {
     override def toString: String = uri.toString
   }
 
@@ -76,17 +73,17 @@ object Server {
      }
   }
 
-  def createKeys(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix): Failing[ApiKeys] =
+  def createKeys(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix, httpClient: Client[IO]): Failing[ApiKeys] =
     for {
-      isOldServer <- checkOldServer(registryRoot)
-      apiKeys <- getApiKeys(buildCreateKeysRequest(registryRoot, masterApiKey, prefix, isOldServer))
+      isOldServer <- checkOldServer(registryRoot, httpClient)
+      apiKeys <- getApiKeys(buildCreateKeysRequest(registryRoot, masterApiKey, prefix, isOldServer), httpClient)
     } yield apiKeys
 
   /** Create transitive pair of keys that will be deleted right after job completed */
-  def temporaryKeys(registryRoot: HttpUrl, masterApiKey: UUID): Resource[Failing, ApiKeys] =
-    Resource.make(createKeys(registryRoot, masterApiKey,VendorPrefix.Wildcard)) { keys =>
-      val deleteRead = deleteKey(registryRoot, masterApiKey, keys.read, "read")
-      val deleteWrite = deleteKey(registryRoot, masterApiKey, keys.write, "write")
+  def temporaryKeys(registryRoot: HttpUrl, masterApiKey: UUID, httpClient: Client[IO]): Resource[Failing, ApiKeys] =
+    Resource.make(createKeys(registryRoot, masterApiKey,VendorPrefix.Wildcard, httpClient)) { keys =>
+      val deleteRead = deleteKey(registryRoot, masterApiKey, keys.read, "read", httpClient)
+      val deleteWrite = deleteKey(registryRoot, masterApiKey, keys.write, "write", httpClient)
       EitherT.liftF(deleteWrite *> deleteRead)
     }
 
@@ -96,17 +93,18 @@ object Server {
     * @param key UUID of temporary key
     * @param purpose what exact key being deleted, used to log, can be empty
     */
-  def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: UUID, purpose: String): IO[Unit] = {
-    val request = Http(s"$registryRoot/api/auth/keygen")
-      .header("apikey", masterApiKey.toString)
-      .param("key", key.toString)
-      .method("DELETE")
+  def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: UUID, purpose: String, httpClient: Client[IO]): IO[Unit] = {
+    val request = Request[IO]()
+      .withMethod(DELETE)
+      .withUri(registryRoot.uri.withPath("/api/auth/keygen"))
+      .withHeaders(Header("apikey", masterApiKey.toString), Header("key", key.toString))
 
-    IO(Validated.catchNonFatal(request.asString) match {
-      case Validated.Valid(response) if response.isSuccess => println(s"$purpose key $key deleted")
-      case Validated.Valid(response) => println(s"FAILURE: DELETE $purpose $key response: ${response.body}")
-      case Validated.Invalid(throwable) => println(s"FAILURE: $purpose $key: ${throwable.toString}")
-    })
+    httpClient.run(request).use { response: Response[IO] =>
+      response.as[String].map { resp: String =>
+        if(response.status.isSuccess) println(s"$purpose key $key deleted")
+        else println(s"FAILURE: DELETE $purpose $key response: $resp")
+      }.handleErrorWith(throwable => IO.pure(println(s"FAILURE: $purpose $key: ${throwable.toString}")))
+    }
   }
 
   object HttpUrl {
@@ -120,9 +118,9 @@ object Server {
     def parse(url: String): Either[Error, HttpUrl] =
       Either.catchNonFatal {
         if (url.startsWith("http://") || url.startsWith("https://")) {
-          HttpUrl(new URI(url.stripSuffix("/")))
+          HttpUrl(Uri.unsafeFromString(url.stripSuffix("/")))
         } else {
-          HttpUrl(new URI("http://" + url.stripSuffix("/")))
+          HttpUrl(Uri.unsafeFromString("http://" + url.stripSuffix("/")))
         }
       }.leftMap(error => Error.ConfigParseError(error.getMessage))
   }
@@ -134,25 +132,38 @@ object Server {
     * @param oldServer true if Server is pre-0.6.0
     * @return HTTP POST-request ready to be sent
     */
-  def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix, oldServer: Boolean): HttpRequest = {
-    val initRequest = Http(s"${registryRoot.uri}/api/auth/keygen").header("apikey", masterApiKey.toString)
-    if (oldServer) initRequest.postForm(List(("vendor_prefix", prefix.show)))
-    else initRequest.postData(prefix.asJson.noSpaces)
+
+  def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix, oldServer: Boolean): Request[IO] = {
+    val initRequest = Request[IO]()
+      .withMethod(POST)
+      .withUri(registryRoot.uri.withPath("/api/auth/keygen"))
+      .withHeaders(Header("apikey", masterApiKey.toString))
+
+    if(oldServer) {
+      initRequest.withEntity(UrlForm("vendor_prefix" -> prefix.show))
+    } else
+      initRequest.withEntity(prefix)
   }
 
   /**
-    * Build HTTP POST-request with JSON Schema and authenticated with temporary
+    * Build HTTP PUT-request with JSON Schema and authenticated with temporary
     * write key
     *
     * @param schema valid self-describing JSON Schema
     * @param writeKey temporary apikey allowed to write any Schema
-    * @return HTTP POST-request ready to be sent
+    * @return HTTP PUT-request ready to be sent
     */
-  def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: UUID): HttpRequest =
-    Http(s"${registryRoot.uri}/api/schemas/${schema.self.schemaKey.toPath}")
-      .header("apikey", writeKey.toString)
-      .param("isPublic", isPublic.toString)
-      .put(schema.asString)
+  def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: UUID) = {
+    val uri = registryRoot.uri
+      .withPath(s"/api/schemas/${schema.self.schemaKey.toPath}")
+      .withQueryParam("isPublic", isPublic.toString)
+
+    Request[IO]()
+      .withMethod(PUT)
+      .withUri(uri)
+      .withHeaders(Header("apikey", writeKey.toString))
+      .withEntity(schema)
+  }
 
   /**
     * Build HTTP GET request for all JSON Schemas and authenticated with temporary
@@ -163,12 +174,17 @@ object Server {
     *                apikey and therefore only public schemas will be read
     * @return HTTP GET request ready to be sent
     */
-  def buildPullRequest(registryRoot: HttpUrl, optReadApiKey: Option[UUID]): HttpRequest = {
-    val httpRequest = Http(s"${registryRoot.uri}/api/schemas?repr=canonical").header("accept", "application/json")
-    optReadApiKey match {
-      case None => httpRequest
-      case Some(readApiKey) => httpRequest.header("apikey", readApiKey.toString)
+  def buildPullRequest(registryRoot: HttpUrl, optReadApiKey: Option[UUID])= {
+    val uri = registryRoot.uri
+      .withPath("/api/schemas")
+      .withQueryParam("repr", "canonical")
+
+    val headers = optReadApiKey match {
+      case None => Headers(Header("accept", "application/json"))
+      case Some(readApiKey) => Headers(Header("accept", "application/json"), Header("apikey", readApiKey.toString))
     }
+
+    Request[IO]().withUri(uri).withHeaders(headers)
   }
 
   /**
@@ -179,22 +195,23 @@ object Server {
     * @return pair of apikeys for successful creation and extraction
     *         error message otherwise
     */
-  def getApiKeys(request: HttpRequest): Failing[ApiKeys] =
-    for {
-      response  <- EitherT.liftF(IO(request.asString))
-      json      <- EitherT.fromEither[IO](parseApiKeyResponse(response))
-      extracted <- EitherT.fromEither[IO](json.as[ApiKeys]).leftMap(Error.fromServer(response))
-    } yield extracted
 
-  def parseApiKeyResponse(response: HttpResponse[String]): Either[Error, Json] =
-    if (response.isSuccess) {
-      parse(response.body).leftMap(Error.fromServer(response))
-    } else Left(Error.Message(s"Unexpected status code ${response.code}. Response body: ${response.body}."))
+  def getApiKeys(request: Request[IO], httpClient: Client[IO]): Failing[ApiKeys] =
+    EitherT(httpClient.run(request).use { response => parseApiKeyResponse(response)})
+
+  def parseApiKeyResponse(response: Response[IO]): IO[Either[Error, ApiKeys]] =
+    if (response.status.isSuccess) {
+      (for {
+        responseString <- EitherT(response.as[String].redeem(err => ServiceError(s"Unable to convert apikey response to string: $err").asLeft, _.asRight))
+        jsonOrError <- EitherT(IO.pure(parse(responseString).leftMap(err => Error.fromServer(response, responseString)(err))))
+        apiKey <- EitherT(IO.pure(jsonOrError.as[ApiKeys].leftMap(err => Error.fromServer(response, responseString)(err))))
+      } yield apiKey).value
+    } else response.as[String].map(resp => Left(Error.Message(s"Unexpected status code ${response.status.code}. Response body: ${resp}.")))
 
   /** Check if Server is pre-0.6.0 */
-  def checkOldServer(registryRoot: HttpUrl): Failing[Boolean] = {
-    val healthRequest = Http(s"${registryRoot.uri}/api/meta/health")
-    EitherT.liftF(IO(healthRequest.asString)).map(response => !response.body.contains("OK"))
+  def checkOldServer(registryRoot: HttpUrl, httpClient: Client[IO]): Failing[Boolean] = {
+    val healthCheckRequest = Request[IO]().withUri(registryRoot.uri.withPath("/api/meta/health"))
+    EitherT.liftF(httpClient.expect[String](healthCheckRequest).map(resp => !resp.contains("OK")))
   }
 
   private val VendorRegex = "[a-zA-Z0-9-_.]+"

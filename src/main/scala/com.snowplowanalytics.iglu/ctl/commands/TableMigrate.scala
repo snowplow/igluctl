@@ -12,8 +12,6 @@
  */
 package com.snowplowanalytics.iglu.ctl.commands
 
-import java.nio.file.Path
-
 import cats.data._
 import cats.effect._
 import cats.implicits._
@@ -23,8 +21,7 @@ import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap}
 import com.snowplowanalytics.iglu.schemaddl.{StringUtils => SchemaDDLStringUtils}
 import com.snowplowanalytics.iglu.schemaddl.redshift.{Column => DDLColumn}
 
-import com.snowplowanalytics.iglu.ctl.Command.{DbConfig, S3Path}
-import com.snowplowanalytics.iglu.ctl.{Common, Result, Storage}
+import com.snowplowanalytics.iglu.ctl.{Common, Result, Storage, Command}
 import com.snowplowanalytics.iglu.ctl.Storage.Column
 
 
@@ -38,19 +35,13 @@ object TableMigrate {
     * the given schema and if it has not expected structure, creates necessary migration
     * SQL statements
     */
-  def process(resolver: Path,
-              schema: SchemaKey,
-              dbSchema: String,
-              outputS3Path: S3Path,
-              awsRole: String,
-              awsRegion: String,
-              dbConfig: DbConfig)(implicit cs: ContextShift[IO], t: Timer[IO]): Result =
+  def process(command: Command.TableMigrate)(implicit cs: ContextShift[IO], t: Timer[IO]): Result =
     (for {
-      resolvedDbConfig <- Storage.resolveDbConfig(dbConfig)
+      resolvedDbConfig <- Storage.resolveDbConfig(command.dbConfig)
       res <- EitherT(Storage.initialize[IO](resolvedDbConfig).use { storage =>
         (for {
-          tableCheckRes <- TableCheck.tableCheckSingle(resolver, schema, storage, dbSchema)
-          res <- EitherT.fromEither[IO](getResult(tableCheckRes, outputS3Path, awsRole, awsRegion))
+          tableCheckRes <- TableCheck.tableCheckSingle(command.singleTableCheck.resolver, command.singleTableCheck.schema, storage, command.dbSchema)
+          res <- EitherT.fromEither[IO](getResult(tableCheckRes, command.outputS3Path, command.awsRole, command.awsRegion))
         } yield res).value
       })
     } yield res).leftMap(e => NonEmptyList.of(e)).map(e => List(e))

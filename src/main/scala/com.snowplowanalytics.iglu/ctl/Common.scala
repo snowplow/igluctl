@@ -13,25 +13,18 @@
 package com.snowplowanalytics.iglu.ctl
 
 import java.nio.file.Path
-
 import scala.annotation.tailrec
-
 import cats.arrow.FunctionK
 import cats.{Foldable, Show}
 import cats.data.{EitherNel, EitherT, Ior, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
 import cats.Order
-
-import scalaj.http.HttpResponse
-
-import io.circe.{ Error => CirceError, ParsingFailure, DecodingFailure }
-
+import io.circe.{DecodingFailure, ParsingFailure, Error => CirceError}
 import fs2.Stream
-
 import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SchemaVer}
 import com.snowplowanalytics.iglu.core.SchemaVer.orderingFull
-
+import org.http4s.Response
 
 object Common {
 
@@ -96,19 +89,14 @@ object Common {
       case Error.WriteError(path, reason) => s"Cannot write [$path]: $reason"
     }
 
-    def fromServer(response: HttpResponse[String])(error: CirceError): Error = {
-      val headersCompact = response.headers.map {
-        case (k, v) => v.toList match {
-          case h :: Nil => show"$k=$h"
-          case vs => show"$k=${vs.mkString(",")}"
-        }
-      }
-      val res = show"HTTP Status: ${response.code}; Headers: ${headersCompact.mkString(",")} Body: ${response.body}"
+    def fromServer(response: Response[IO], responseString: String)(error: CirceError): Error = {
+      val headersCompact = response.headers.toList.map { header => show"${header.name}=${header.value}"}.mkString(",")
+      val errorString = show"HTTP Status: ${response.status.code}; Headers: ${headersCompact.mkString(",")} Body: ${responseString}"
       error match {
         case _: ParsingFailure =>
-          ServiceError(show"Cannot parse Server response, not a JSON. $res. Error: $error")
+          ServiceError(show"Cannot parse Server response, not a JSON. $errorString. Error: $error")
         case _: DecodingFailure =>
-          ServiceError(show"Unexpected JSON response from Server:  $res. Error: $error")
+          ServiceError(show"Unexpected JSON response from Server:  $errorString. Error: $error")
       }
     }
   }

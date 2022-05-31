@@ -24,7 +24,7 @@ object Dependencies {
     val schemaddl        = "0.14.1"
     val igluClient       = "1.1.1"
     val decline          = "1.4.0"
-    val scalajHttp       = "2.4.2"
+    val http4s           = "0.21.33"
     val fs2              = "2.5.9"
     val doobie           = "0.13.4"
     val logback          = "1.2.3"
@@ -43,7 +43,9 @@ object Dependencies {
     val igluClient       = "com.snowplowanalytics"      %% "iglu-scala-client"         % V.igluClient
     val schemaddl        = "com.snowplowanalytics"      %% "schema-ddl"                % V.schemaddl
     val decline          = "com.monovore"               %% "decline"                   % V.decline
-    val scalajHttp       = "org.scalaj"                 %% "scalaj-http"               % V.scalajHttp
+    val http4sEmberCli   = "org.http4s"                 %% "http4s-ember-client"       % V.http4s
+    val http4sCirce      = "org.http4s"                 %% "http4s-circe"              % V.http4s
+    val http4sDsl        = "org.http4s"                 %% "http4s-dsl"                % V.http4s
     val fs2              = "co.fs2"                     %% "fs2-core"                  % V.fs2
     val fs2Io            = "co.fs2"                     %% "fs2-io"                    % V.fs2
     val doobieCore       = "org.tpolecat"               %% "doobie-core"               % V.doobie

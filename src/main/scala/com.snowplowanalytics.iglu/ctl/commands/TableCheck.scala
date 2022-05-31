@@ -42,6 +42,7 @@ import com.snowplowanalytics.iglu.ctl.{File, Server, Common, Storage, Command, F
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.Storage.Column
 import com.snowplowanalytics.iglu.ctl.commands.TableCheck.Result._
+import org.http4s.client.Client
 
 
 object TableCheck {
@@ -103,17 +104,15 @@ object TableCheck {
     * has expected structure which is determined with last and previous versions of
     * the given schema
     */
-  def process(tableCheckType: Command.TableCheckType,
-              dbschema: String,
-              storageConfig: Command.DbConfig)(implicit cs: ContextShift[IO], t: Timer[IO]): FinalResult = {
+  def process(command: Command.TableCheck, httpClient: Client[IO])(implicit cs: ContextShift[IO], t: Timer[IO]): FinalResult = {
     val stream = for {
-      resolvedDbConfig <- Stream.eval(Storage.resolveDbConfig(storageConfig))
+      resolvedDbConfig <- Stream.eval(Storage.resolveDbConfig(command.storageConfig))
       storage <- Stream.resource(Storage.initialize[IO](resolvedDbConfig)).translate[IO, Failing](Common.liftIO)
-      res     <- tableCheckType match {
+      res     <- command.tableCheckType match {
         case Command.SingleTableCheck(resolver, schema) =>
-          Stream.eval(tableCheckSingle(resolver, schema, storage, dbschema))
+          Stream.eval(tableCheckSingle(resolver, schema, storage, command.dbSchema))
         case Command.MultipleTableCheck(igluServerUrl, apiKey) =>
-          tableCheckMultiple(igluServerUrl, apiKey, storage, dbschema)
+          tableCheckMultiple(igluServerUrl, apiKey, storage, command.dbSchema, httpClient)
       }
     } yield res
 
@@ -170,20 +169,20 @@ object TableCheck {
     * corresponding tables of all the schemas is matching or not
     * Returns result stream of table check processes in the end
     */
-  def tableCheckMultiple(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], storage: Storage[IO], dbschema: String): Stream[Failing, Result] =
+  def tableCheckMultiple(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], storage: Storage[IO], dbschema: String, httpClient: Client[IO]): Stream[Failing, Result] =
     for {
-      schemas <- Stream.eval(getSchemas(registryRoot, readApiKey))
+      schemas <- Stream.eval(getSchemas(registryRoot, readApiKey, httpClient))
       schema <- Stream.emits[Failing, (SchemaKey, SchemaList)](schemas)
       (schemaKey, modelGroup) = schema
       res         <- Stream.eval(checkTable(storage, schemaKey, modelGroup, dbschema))
     } yield res
 
-  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID]): Failing[List[(SchemaKey, SchemaList)]] = {
+  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], httpClient: Client[IO]): Failing[List[(SchemaKey, SchemaList)]] = {
     for {
       schemas <- SchemaList.fromFetchedSchemas[IO, Common.Error](
         {
           for {
-            schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey))
+            schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey), httpClient)
             schemas     <- EitherT.fromEither[IO](Generate.parseSchemas(schemaJsons))
             res <- EitherT.fromEither[IO](
               NonEmptyList.fromList(schemas) match {
