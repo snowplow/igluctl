@@ -15,10 +15,12 @@ package com.snowplowanalytics.iglu.ctl
 import cats.Show
 import cats.data.{EitherNel, EitherT}
 import cats.implicits._
-import cats.effect.{ExitCode, IO, IOApp}
-
+import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.snowplowanalytics.iglu.ctl.commands._
 import com.snowplowanalytics.iglu.ctl.Common.Error
+import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
+
 
 object Main extends IOApp {
 
@@ -49,29 +51,32 @@ object Main extends IOApp {
 
   def run(args: List[String]): IO[ExitCode] = {
     val result: Result = Command.parse(args) match {
-      case Right(Command.Lint(input, skipChecks, skipSchemas)) =>
-        Lint.process(input, skipChecks, skipSchemas)
+      case Right(command: Command.Lint) =>
+        Lint.process(command)
 
-      case Right(Command.StaticGenerate(in, out, schema, own, size, jp, raw, noheader, f)) =>
-        Generate.process(in, out, jp, raw, schema, size, noheader, f, own)
-      case Right(Command.StaticPush(input, registryRoot, apikey, public, legacy)) =>
-        Push.process(input, registryRoot, apikey, public, legacy)
-      case Right(Command.StaticPull(output, registryRoot, apikey)) =>
-        Pull.process(output, registryRoot, apikey)
-      case Right(Command.StaticS3Cp(input, bucket, s3Path, accessKey, secretKey, profile, region, skipSchemaLists)) =>
-        S3cp.process(input, bucket, s3Path, accessKey, secretKey, profile, region, skipSchemaLists)
+      case Right(command: Command.StaticGenerate) =>
+        Generate.process(command)
 
-      case Right(Command.ServerKeygen(server, masterKey, prefix)) =>
-        Keygen.process(server, masterKey, prefix)
+      case Right(command: Command.StaticPush) =>
+        withClient { client => Push.process(command, client)}
 
-      case Right(Command.StaticDeploy(config)) =>
-        Deploy.process(config)
+      case Right(command: Command.StaticPull) =>
+        withClient { client => Pull.process(command, client)}
 
-      case Right(Command.TableCheck(tableCheckType, dbschema, storageConfig)) =>
-        TableCheck.process(tableCheckType, dbschema, storageConfig)
+      case Right(command: Command.StaticS3Cp) =>
+        S3cp.process(command)
 
-      case Right(Command.TableMigrate(tableCheck, dbSchema, outputS3Path, awsRole, awsRegion, dbConfig)) =>
-        TableMigrate.process(tableCheck.resolver, tableCheck.schema, dbSchema, outputS3Path, awsRole, awsRegion, dbConfig)
+      case Right(command: Command.ServerKeygen) =>
+        withClient { client => Keygen.process(command, client)}
+
+      case Right(command: Command.StaticDeploy) =>
+        withClient { client => Deploy.process(command, client)}
+
+      case Right(command: Command.TableCheck) =>
+        withClient { client => TableCheck.process(command, client)}
+
+      case Right(command: Command.TableMigrate) =>
+        TableMigrate.process(command)
 
       case Right(Command.VersionFlag) =>
         EitherT.fromEither[IO](List(generated.ProjectSettings.version).asRight)
@@ -82,6 +87,10 @@ object Main extends IOApp {
 
     result.value.flatMap(processResult[String])
   }
+
+  val httpClientResource: Resource[IO, Client[IO]] = EmberClientBuilder.default[IO].build
+
+  def withClient(f: Client[IO] => Result): Result = EitherT(httpClientResource.use { client => f(client).value})
 
   def processResult[A: Show](either: EitherNel[Error, List[A]]): IO[ExitCode] =
     either.fold(

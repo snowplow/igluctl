@@ -13,20 +13,17 @@
 package com.snowplowanalytics.iglu.ctl
 package commands
 
-import java.nio.file.Path
 import java.util.UUID
-
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{IO, Resource}
 import cats.implicits._
-
-import scalaj.http.{HttpRequest, HttpResponse}
-
+import com.snowplowanalytics.iglu.ctl.Command.StaticPush
+import com.snowplowanalytics.iglu.ctl.{Result => IgluctlResult}
 import io.circe.Decoder
-import io.circe.jawn.parse
 import io.circe.generic.semiauto._
-
-import com.snowplowanalytics.iglu.ctl.{ Result => IgluctlResult }
+import org.http4s.circe.jsonOf
+import org.http4s.client.Client
+import org.http4s.{EntityDecoder, Request, Response}
 
 /**
  * Companion objects, containing functions not closed on `masterApiKey`, `registryRoot`, etc
@@ -42,19 +39,19 @@ object Push {
     * @param legacy whether it should be compatible with pre-0.6.0 Server,
     *               which required to create temporary keys first
     */
-  def process(inputDir: Path,
-              registryRoot: Server.HttpUrl,
-              apiKey: UUID,
-              isPublic: Boolean,
-              legacy: Boolean): IgluctlResult = {
-    val apiKeyResource: Resource[Failing, UUID] = if (legacy) Server.temporaryKeys(registryRoot, apiKey).map(_.write) else Resource.pure[Failing, UUID](apiKey)
+  def process(command: StaticPush, httpClient: Client[IO]): IgluctlResult = {
+    val apiKeyResource =
+      if(command.legacy)
+        Server.temporaryKeys(command.registryRoot, command.apikey, httpClient).map(_.write)
+      else
+        Resource.pure[Failing, UUID](command.apikey)
 
     apiKeyResource.mapK[Failing, FailingNel](Common.liftFailingNel).use { apiKey =>
       for {
-        files   <- EitherT(File.readSchemas(inputDir).map(Common.leftBiasedIor))
+        files   <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
         result  <- files.toList.traverse { file =>
-            val request = Server.buildPushRequest(registryRoot, isPublic, file.content, apiKey)
-            postSchema(request).map(_.asString)
+          val request = Server.buildPushRequest(command.registryRoot, command.public, file.content, apiKey)
+          postSchema(request, httpClient).map(_.asString)
         }.leftMap(NonEmptyList.of(_))
       } yield result
     }
@@ -68,18 +65,21 @@ object Push {
    * @param location optional URI available for successful upload
    */
   case class ServerMessage(status: Option[Int], message: String, location: Option[String])
+
   object ServerMessage {
     def asString(status: Option[Int], message: String, location: Option[String]): String =
       s"$message ${location.map("at " + _ + " ").getOrElse("")} ${status.map(x => s"($x)").getOrElse("")}"
 
     implicit val serverMessageCirceDecoder: Decoder[ServerMessage] =
       deriveDecoder[ServerMessage]
+    implicit val serverMessageDecoder: EntityDecoder[IO, ServerMessage] = jsonOf[IO, ServerMessage]
   }
 
   /**
    * ADT representing all possible statuses for Schema upload
    */
   sealed trait Status extends Serializable
+
   object Status {
     case object Updated extends Status
     case object Created extends Status
@@ -103,54 +103,29 @@ object Push {
       }
   }
 
-
   /**
-   * Transform failing [[Result]] to plain [[Result]] by inserting exception
-   * message instead of server message
-   *
-   * @param result disjucntion of string with result
-   * @return plain result
-   */
-  def flattenResult(result: Either[String, Result]): Result =
-    result match {
-      case Right(status) => status
-      case Left(failure) => Result(Left(failure), Status.Failed)
-    }
-
-  /**
-   * Extract stringified message from server response through [[ServerMessage]]
-   *
-   * @param response HTTP response from Iglu registry, presumably containing JSON
-   * @return success message processed from JSON or error message if upload
-   *         wasn't successful
-   */
-  def getUploadStatus(response: HttpResponse[String]): Result = {
-    if (response.isSuccess) {
-      val result = for {
-        json <- parse(response.body)
-        message <- json.as[ServerMessage]
-      } yield message
-
-      result match {
-        case Right(serverMessage) if serverMessage.message.contains("updated") =>
-          Result(Right(serverMessage), Status.Updated)
-        case Right(serverMessage) =>
-          Result(Right(serverMessage), Status.Created)
-        case Left(_) =>
-          Result(Left(response.body), Status.Unknown)
+    * Perform HTTP request bundled with temporary write key and valid
+    * self-describing JSON Schema to /api/schemas/SCHEMAPATH to publish new
+    * Schema.
+    * Performs IO
+    *
+    * @param request HTTP POST-request with JSON Schema
+    * @return successful parsed message or error message
+    */
+  def postSchema(request: Request[IO], httpClient: Client[IO]): Failing[Result] = {
+    val result = httpClient.run(request).use { response: Response[IO] =>
+      if(response.status.isSuccess) {
+          response.as[ServerMessage].map { msg =>
+            if (msg.message.contains("updated"))
+              Result(Right(msg), Status.Updated)
+            else
+              Result(Right(msg), Status.Created)
+        }.handleErrorWith(err => IO.pure(Result(Left(err.getMessage), Status.Unknown)))
+      } else {
+        response.as[String].map(s => Result(Left(s), Status.Failed))
       }
-    } else Result(Left(response.body), Status.Failed)
+    }
+    EitherT.liftF(result)
   }
 
-  /**
-   * Perform HTTP request bundled with temporary write key and valid
-   * self-describing JSON Schema to /api/schemas/SCHEMAPATH to publish new
-   * Schema.
-   * Performs IO
-   *
-   * @param request HTTP POST-request with JSON Schema
-   * @return successful parsed message or error message
-   */
-  def postSchema(request: HttpRequest): Failing[Result] =
-    EitherT.liftF(IO(request.asString).map(getUploadStatus))
 }
