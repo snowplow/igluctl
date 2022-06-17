@@ -17,6 +17,7 @@ object Dependencies {
   object V {
     // Java
     val awsJava          = "2.17.213"
+    val jackson          = "2.12.7"
     // Scala
     val circe            = "0.14.1"
     val circeConfig      = "0.8.0"
@@ -36,6 +37,8 @@ object Dependencies {
   object Libraries {
     // Java
     val awsJava          = "software.amazon.awssdk"     %  "s3"                        % V.awsJava
+    val jacksonDatabind  = "com.fasterxml.jackson.core" % "jackson-databind"           % V.jackson // override transitive version to address security vulnerabilities
+
     // Scala
     val circeParser      = "io.circe"                   %% "circe-jawn"                % V.circe
     val circeConfig      = "io.circe"                   %% "circe-config"              % V.circeConfig
