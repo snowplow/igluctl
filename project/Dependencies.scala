@@ -16,7 +16,7 @@ object Dependencies {
 
   object V {
     // Java
-    val awsJava          = "2.17.13"
+    val awsJava          = "2.17.213"
     // Scala
     val circe            = "0.14.1"
     val circeConfig      = "0.8.0"
