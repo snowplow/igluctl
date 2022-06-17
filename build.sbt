@@ -27,6 +27,7 @@ lazy val root = project.in(file("."))
     libraryDependencies ++= Seq(
       // Java
       Libraries.awsJava,
+      Libraries.jacksonDatabind,
       // Scala
       Libraries.circeParser,
       Libraries.circeConfig,
