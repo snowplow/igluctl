@@ -50,7 +50,6 @@ object Dependencies {
     val fs2              = "co.fs2"                     %% "fs2-core"                  % V.fs2
     val fs2Io            = "co.fs2"                     %% "fs2-io"                    % V.fs2
     val doobieCore       = "org.tpolecat"               %% "doobie-core"               % V.doobie
-    val doobiePostgres   = "org.tpolecat"               %% "doobie-postgres"           % V.doobie
     val logback          = "ch.qos.logback"             % "logback-classic"            % V.logback % Runtime
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2-core"               % V.specs2         % "test"
