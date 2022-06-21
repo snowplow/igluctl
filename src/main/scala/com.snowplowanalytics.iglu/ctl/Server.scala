@@ -20,7 +20,7 @@ import io.circe.jawn.parse
 import io.circe.syntax._
 import io.circe.generic.semiauto._
 
-import scalaj.http.{Http, HttpRequest, HttpResponse}
+import scalaj.http.{Http, HttpOptions, HttpRequest, HttpResponse}
 
 import Common.Error
 
@@ -99,6 +99,7 @@ object Server {
   def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: UUID, purpose: String): IO[Unit] = {
     val request = Http(s"$registryRoot/api/auth/keygen")
       .header("apikey", masterApiKey.toString)
+      .option(HttpOptions.followRedirects(true))
       .param("key", key.toString)
       .method("DELETE")
 
@@ -135,7 +136,9 @@ object Server {
     * @return HTTP POST-request ready to be sent
     */
   def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix, oldServer: Boolean): HttpRequest = {
-    val initRequest = Http(s"${registryRoot.uri}/api/auth/keygen").header("apikey", masterApiKey.toString)
+    val initRequest = Http(s"${registryRoot.uri}/api/auth/keygen")
+      .header("apikey", masterApiKey.toString)
+      .option(HttpOptions.followRedirects(true))
     if (oldServer) initRequest.postForm(List(("vendor_prefix", prefix.show)))
     else initRequest.postData(prefix.asJson.noSpaces)
   }
@@ -151,6 +154,7 @@ object Server {
   def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: UUID): HttpRequest =
     Http(s"${registryRoot.uri}/api/schemas/${schema.self.schemaKey.toPath}")
       .header("apikey", writeKey.toString)
+      .option(HttpOptions.followRedirects(true))
       .param("isPublic", isPublic.toString)
       .put(schema.asString)
 
@@ -164,7 +168,10 @@ object Server {
     * @return HTTP GET request ready to be sent
     */
   def buildPullRequest(registryRoot: HttpUrl, optReadApiKey: Option[UUID]): HttpRequest = {
-    val httpRequest = Http(s"${registryRoot.uri}/api/schemas?repr=canonical").header("accept", "application/json")
+    val httpRequest = Http(s"${registryRoot.uri}/api/schemas?repr=canonical")
+      .header("accept", "application/json")
+      .option(HttpOptions.followRedirects(true))
+
     optReadApiKey match {
       case None => httpRequest
       case Some(readApiKey) => httpRequest.header("apikey", readApiKey.toString)
@@ -193,7 +200,7 @@ object Server {
 
   /** Check if Server is pre-0.6.0 */
   def checkOldServer(registryRoot: HttpUrl): Failing[Boolean] = {
-    val healthRequest = Http(s"${registryRoot.uri}/api/meta/health")
+    val healthRequest = Http(s"${registryRoot.uri}/api/meta/health").option(HttpOptions.followRedirects(true))
     EitherT.liftF(IO(healthRequest.asString)).map(response => !response.body.contains("OK"))
   }
 
