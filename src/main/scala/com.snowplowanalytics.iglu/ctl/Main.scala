@@ -19,6 +19,7 @@ import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.snowplowanalytics.iglu.ctl.commands._
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import org.http4s.client.Client
+import org.http4s.client.middleware.FollowRedirect
 import org.http4s.ember.client.EmberClientBuilder
 
 
@@ -90,7 +91,7 @@ object Main extends IOApp {
 
   val httpClientResource: Resource[IO, Client[IO]] = EmberClientBuilder.default[IO].build
 
-  def withClient(f: Client[IO] => Result): Result = EitherT(httpClientResource.use { client => f(client).value})
+  def withClient(f: Client[IO] => Result): Result = EitherT(httpClientResource.use { client => f(FollowRedirect(20)(client)).value })
 
   def processResult[A: Show](either: EitherNel[Error, List[A]]): IO[ExitCode] =
     either.fold(
