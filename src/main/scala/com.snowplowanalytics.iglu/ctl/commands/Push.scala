@@ -13,9 +13,8 @@
 package com.snowplowanalytics.iglu.ctl
 package commands
 
-import java.util.UUID
 import cats.data.{EitherT, NonEmptyList}
-import cats.effect.{IO, Resource}
+import cats.effect.IO
 import cats.implicits._
 import com.snowplowanalytics.iglu.ctl.Command.StaticPush
 import com.snowplowanalytics.iglu.ctl.{Result => IgluctlResult}
@@ -34,27 +33,17 @@ object Push {
     * Primary function, performing IO reading, processing and printing results
     * @param inputDir path to schemas to upload
     * @param registryRoot Iglu Server endpoint (without `/api`)
-    * @param apiKey API key with write permissions (master key if `legacy` is true)
+    * @param apiKey API key with write permissions
     * @param isPublic whether schemas should be publicly available
-    * @param legacy whether it should be compatible with pre-0.6.0 Server,
-    *               which required to create temporary keys first
     */
   def process(command: StaticPush, httpClient: Client[IO]): IgluctlResult = {
-    val apiKeyResource =
-      if(command.legacy)
-        Server.temporaryKeys(command.registryRoot, command.apikey, httpClient).map(_.write)
-      else
-        Resource.pure[Failing, UUID](command.apikey)
-
-    apiKeyResource.mapK[Failing, FailingNel](Common.liftFailingNel).use { apiKey =>
-      for {
-        files   <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
-        result  <- files.toList.traverse { file =>
-          val request = Server.buildPushRequest(command.registryRoot, command.public, file.content, apiKey)
-          postSchema(request, httpClient).map(_.asString)
-        }.leftMap(NonEmptyList.of(_))
-      } yield result
-    }
+    for {
+      files   <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
+      result  <- files.toList.traverse { file =>
+        val request = Server.buildPushRequest(command.registryRoot, command.public, file.content, command.apikey)
+        postSchema(request, httpClient).map(_.asString)
+      }.leftMap(NonEmptyList.of(_))
+    } yield result
   }
 
   /**
