@@ -19,15 +19,15 @@ import io.circe.generic.semiauto._
 import Common.Error
 import cats.Show
 import cats.data.EitherT
-import cats.effect.{IO, Resource}
+import cats.effect.IO
 import cats.syntax.either._
 import cats.syntax.show._
 import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.ctl.Common.Error.{ServiceError}
+import com.snowplowanalytics.iglu.ctl.Common.Error.ServiceError
 import org.http4s.circe.CirceEntityCodec.circeEntityEncoder
 import org.http4s.client.Client
-import org.http4s.{Header, Headers, Request, Response, Uri, UrlForm}
+import org.http4s.{Header, Headers, Request, Response, Uri}
 import org.http4s.dsl.io.{DELETE, POST, PUT}
 
 /** Common functions and entities for communication with Iglu Server */
@@ -74,18 +74,7 @@ object Server {
   }
 
   def createKeys(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix, httpClient: Client[IO]): Failing[ApiKeys] =
-    for {
-      isOldServer <- checkOldServer(registryRoot, httpClient)
-      apiKeys <- getApiKeys(buildCreateKeysRequest(registryRoot, masterApiKey, prefix, isOldServer), httpClient)
-    } yield apiKeys
-
-  /** Create transitive pair of keys that will be deleted right after job completed */
-  def temporaryKeys(registryRoot: HttpUrl, masterApiKey: UUID, httpClient: Client[IO]): Resource[Failing, ApiKeys] =
-    Resource.make(createKeys(registryRoot, masterApiKey,VendorPrefix.Wildcard, httpClient)) { keys =>
-      val deleteRead = deleteKey(registryRoot, masterApiKey, keys.read, "read", httpClient)
-      val deleteWrite = deleteKey(registryRoot, masterApiKey, keys.write, "write", httpClient)
-      EitherT.liftF(deleteWrite *> deleteRead)
-    }
+    getApiKeys(buildCreateKeysRequest(registryRoot, masterApiKey, prefix), httpClient)
 
   /**
     * Send DELETE request for an API key.
@@ -129,20 +118,15 @@ object Server {
     * Build HTTP POST-request with master apikey to create temporary
     * read/write apikeys
     *
-    * @param oldServer true if Server is pre-0.6.0
     * @return HTTP POST-request ready to be sent
     */
 
-  def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix, oldServer: Boolean): Request[IO] = {
-    val initRequest = Request[IO]()
+  def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix): Request[IO] = {
+    Request[IO]()
       .withMethod(POST)
       .withUri(registryRoot.uri.withPath("/api/auth/keygen"))
       .withHeaders(Header("apikey", masterApiKey.toString))
-
-    if(oldServer) {
-      initRequest.withEntity(UrlForm("vendor_prefix" -> prefix.show))
-    } else
-      initRequest.withEntity(prefix)
+      .withEntity(prefix)
   }
 
   /**
@@ -207,12 +191,6 @@ object Server {
         apiKey <- EitherT(IO.pure(jsonOrError.as[ApiKeys].leftMap(err => Error.fromServer(response, responseString)(err))))
       } yield apiKey).value
     } else response.as[String].map(resp => Left(Error.Message(s"Unexpected status code ${response.status.code}. Response body: ${resp}.")))
-
-  /** Check if Server is pre-0.6.0 */
-  def checkOldServer(registryRoot: HttpUrl, httpClient: Client[IO]): Failing[Boolean] = {
-    val healthCheckRequest = Request[IO]().withUri(registryRoot.uri.withPath("/api/meta/health"))
-    EitherT.liftF(httpClient.expect[String](healthCheckRequest).map(resp => !resp.contains("OK")))
-  }
 
   private val VendorRegex = "[a-zA-Z0-9-_.]+"
 }

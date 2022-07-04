@@ -82,8 +82,7 @@ class DeploySpec extends Specification { def is = s2"""
         IgluctlAction.Push(Command.StaticPush(
           inputPath, Server.HttpUrl(uri"http://iglu-server.com"),
           UUID.fromString("79f28002-aadc-4bdf-bd79-7209f28873b9"),
-          true,
-          false
+          true
         )),
         IgluctlAction.S3Cp(Command.StaticS3Cp(
           inputPath, "bucket", Some("path_1/path_2"),
@@ -91,7 +90,6 @@ class DeploySpec extends Specification { def is = s2"""
         ))
       )
     )
-
 
     val result = config.as[IgluctlConfig]
     result must beRight(expected)
