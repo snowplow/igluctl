@@ -1,3 +1,12 @@
+Version 0.10.0 (2022-07-05)
+--------------------------
+Drop doobie-postgres (#122)
+Bump jackson-databind to 2.12.7 (#121)
+Bump awssdk s3 to 2.17.213 (#120)
+Use http4s (#119)
+Enable follow redirects (#124)
+Drop support for iglu-server <0.6.0 (#127)
+
 Version 0.9.0 (2022-05-22)
 --------------------------
 Option to filter schemas when linting (#86)
