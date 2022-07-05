@@ -17,10 +17,10 @@ For complete documenation on Igluctl please refer to the [technical documentatio
 
 Make sure you have [Oracle JRE 8][jre] installed.
 
-Artifacts are attached to GitHub releases. e.g. 0.9.0 can be downloaded from
+Artifacts are attached to GitHub releases. e.g. 0.10.0 can be downloaded from
 
 ```
-https://github.com/snowplow-incubator/igluctl/releases/download/0.9.0/igluctl
+https://github.com/snowplow-incubator/igluctl/releases/download/0.10.0/igluctl
 ```
 
 ### Windows
