@@ -85,7 +85,7 @@ object Server {
   def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: UUID, purpose: String, httpClient: Client[IO]): IO[Unit] = {
     val request = Request[IO]()
       .withMethod(DELETE)
-      .withUri(registryRoot.uri.withPath("/api/auth/keygen"))
+      .withUri(registryRoot.uri.addPath("/api/auth/keygen"))
       .withHeaders(Header("apikey", masterApiKey.toString), Header("key", key.toString))
 
     httpClient.run(request).use { response: Response[IO] =>
@@ -124,7 +124,7 @@ object Server {
   def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix): Request[IO] = {
     Request[IO]()
       .withMethod(POST)
-      .withUri(registryRoot.uri.withPath("/api/auth/keygen"))
+      .withUri(registryRoot.uri.addPath("/api/auth/keygen"))
       .withHeaders(Header("apikey", masterApiKey.toString))
       .withEntity(prefix)
   }
@@ -139,7 +139,7 @@ object Server {
     */
   def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: UUID) = {
     val uri = registryRoot.uri
-      .withPath(s"/api/schemas/${schema.self.schemaKey.toPath}")
+      .addPath(s"/api/schemas/${schema.self.schemaKey.toPath}")
       .withQueryParam("isPublic", isPublic.toString)
 
     Request[IO]()
@@ -160,7 +160,7 @@ object Server {
     */
   def buildPullRequest(registryRoot: HttpUrl, optReadApiKey: Option[UUID])= {
     val uri = registryRoot.uri
-      .withPath("/api/schemas")
+      .addPath("/api/schemas")
       .withQueryParam("repr", "canonical")
 
     val headers = optReadApiKey match {
