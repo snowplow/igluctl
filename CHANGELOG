@@ -1,3 +1,7 @@
+Version 0.10.1 (2022-08-11)
+--------------------------
+Ensure igluctl static push works when iglu server url has a path (#130)
+
 Version 0.10.0 (2022-07-05)
 --------------------------
 Drop doobie-postgres (#122)
