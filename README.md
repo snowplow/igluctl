@@ -20,7 +20,7 @@ Make sure you have [Oracle JRE 8][jre] installed.
 Artifacts are attached to GitHub releases. e.g. 0.10.1 can be downloaded from
 
 ```
-https://github.com/snowplow-incubator/igluctl/releases/download/0.10.1/igluctl
+https://github.com/snowplow/igluctl/releases/download/0.10.1/igluctl
 ```
 
 ### Windows
