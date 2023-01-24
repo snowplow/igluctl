@@ -119,7 +119,11 @@ object Deploy {
         includedChecks <- cursor.downField("includedChecks").as[List[String]]
         skippedSchemas <- cursor.downField("skippedSchemas").as[List[String]]
         linters <- Lint.parseOptionalLinters(includedChecks.mkString(",")).leftMap(e => DecodingFailure(e.toString, Nil))
-        schemas <- Lint.parseSkippedSchemas(skippedSchemas.mkString(",")).leftMap(e => DecodingFailure(e.toString, Nil))
+        schemas <-
+          if(skippedSchemas.isEmpty)
+            Nil.asRight[DecodingFailure]
+          else
+            Lint.parseSkippedSchemas(skippedSchemas.mkString(",")).leftMap(e => DecodingFailure(e.toString, Nil))
       } yield Command.Lint(tempPath, linters, schemas)
     }
 

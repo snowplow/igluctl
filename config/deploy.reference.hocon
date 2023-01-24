@@ -6,6 +6,11 @@
     // Configuration for lint command
     "lint": {
 
+      // Schemas to be skipped by linting
+      "skippedSchemas": [
+        "iglu:com.snowplowanalytics.snowplow/screen_view/jsonschema/1-0-0"
+      ]
+
       // Lint using the provided linters
       "includedChecks": [
         "rootObject"
