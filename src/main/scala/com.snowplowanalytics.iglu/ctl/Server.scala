@@ -12,6 +12,7 @@
  */
 package com.snowplowanalytics.iglu.ctl
 import java.util.UUID
+import org.typelevel.ci._
 import io.circe.{Decoder, Encoder, Json}
 import io.circe.jawn.parse
 import io.circe.syntax._
@@ -86,7 +87,7 @@ object Server {
     val request = Request[IO]()
       .withMethod(DELETE)
       .withUri(registryRoot.uri.addPath("/api/auth/keygen"))
-      .withHeaders(Header("apikey", masterApiKey.toString), Header("key", key.toString))
+      .withHeaders(Header.Raw(ci"apikey", masterApiKey.toString), Header.Raw(ci"key", key.toString))
 
     httpClient.run(request).use { response: Response[IO] =>
       response.as[String].map { resp: String =>
@@ -125,7 +126,7 @@ object Server {
     Request[IO]()
       .withMethod(POST)
       .withUri(registryRoot.uri.addPath("/api/auth/keygen"))
-      .withHeaders(Header("apikey", masterApiKey.toString))
+      .withHeaders(Header.Raw(ci"apikey", masterApiKey.toString))
       .withEntity(prefix)
   }
 
@@ -139,13 +140,13 @@ object Server {
     */
   def buildPushRequest(registryRoot: HttpUrl, isPublic: Boolean, schema: SelfDescribingSchema[Json], writeKey: UUID) = {
     val uri = registryRoot.uri
-      .addPath(s"/api/schemas/${schema.self.schemaKey.toPath}")
+      .addPath(s"api/schemas/${schema.self.schemaKey.toPath}")
       .withQueryParam("isPublic", isPublic.toString)
 
     Request[IO]()
       .withMethod(PUT)
       .withUri(uri)
-      .withHeaders(Header("apikey", writeKey.toString))
+      .withHeaders(Header.Raw(ci"apikey", writeKey.toString))
       .withEntity(schema)
   }
 
@@ -164,8 +165,8 @@ object Server {
       .withQueryParam("repr", "canonical")
 
     val headers = optReadApiKey match {
-      case None => Headers(Header("accept", "application/json"))
-      case Some(readApiKey) => Headers(Header("accept", "application/json"), Header("apikey", readApiKey.toString))
+      case None => Headers(Header.Raw(ci"accept", "application/json"))
+      case Some(readApiKey) => Headers(Header.Raw(ci"accept", "application/json"), Header.Raw(ci"apikey", readApiKey.toString))
     }
 
     Request[IO]().withUri(uri).withHeaders(headers)

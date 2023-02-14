@@ -75,8 +75,7 @@ class DeploySpec extends Specification { def is = s2"""
         inputPath, List(Linter.unknownFormats, Linter.rootObject), List(SchemaKey("com.acme", "click", "jsonschema", Full(1,0,1)))
       ),
       Command.StaticGenerate(
-        inputPath, Some(outputPath), "atomic", Some("a_new_owner"), 4096, true,
-        false, false, false
+        inputPath, Some(outputPath), "atomic", false
       ),
       List(
         IgluctlAction.Push(Command.StaticPush(

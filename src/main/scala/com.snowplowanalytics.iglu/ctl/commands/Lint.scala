@@ -220,9 +220,11 @@ object Lint {
           (sortedIssues.map { case (pointer, _) => s" - ${leftPad(pointer.show)}" } mkString "\n")
         case Linter.schemaUri => "Problem with $schema field: \n" ++
           (sortedIssues.map { case (pointer, issue) => s" - ${leftPad(pointer.show)} ${getMessage(issue)}" } mkString "\n")
+        case Linter.bqDisallowedCharacters | Linter.bqIllegalStart => ""
       }
 
-    }
+    }.filterNot(_.isEmpty)
+    
     reports.toList
   }
 

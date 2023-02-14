@@ -20,6 +20,10 @@ import Keys._
 
 
 object BuildSettings {
+  ThisBuild / libraryDependencySchemes ++= Seq(
+    "io.circe" %% "circe-jawn" % "always",
+    "io.circe" %% "circe-core" % "always",
+  )
 
   // Basic settings for our app
   lazy val basicSettings = Seq[Setting[_]](
@@ -77,10 +81,21 @@ object BuildSettings {
     assembly / mainClass := Some("com.snowplowanalytics.iglu.ctl.Main"),
 
     assembly / assemblyMergeStrategy := {
-      case PathList("com", "github", "fge", tail@_*) => MergeStrategy.first
-      case x if x.startsWith("scala/annotation/nowarn") => MergeStrategy.first
-      case x if x.endsWith("module-info.class") => MergeStrategy.first
-      case x if x.endsWith("io.netty.versions.properties") => MergeStrategy.first
+      case x if x.endsWith("module-info.class") => MergeStrategy.discard
+      case PathList("org", "apache", "commons", "logging", _@_*) => MergeStrategy.first
+      case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+      case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.discard
+      case PathList("META-INF", "native-image", _@_*) => MergeStrategy.discard
+      // case PathList("META-INF", _ @ _*) => MergeStrategy.discard    // Replaced with above for Stream Shredder
+      case PathList("reference.conf", _@_*) => MergeStrategy.concat
+      case PathList("codegen-resources", _@_*) => MergeStrategy.first // Part of AWS SDK v2
+      case "mime.types" => MergeStrategy.first // Part of AWS SDK v2
+      case "AUTHORS" => MergeStrategy.discard
+      case PathList("org", "slf4j", "impl", _) => MergeStrategy.first
+      case PathList("buildinfo", _) => MergeStrategy.first
+      case x if x.contains("javax") => MergeStrategy.first
+      case PathList("scala", "annotation", "nowarn.class" | "nowarn$.class") => MergeStrategy.first // http4s, 2.13 shim
+      case x if x.endsWith("public-suffix-list.txt") => MergeStrategy.first
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)

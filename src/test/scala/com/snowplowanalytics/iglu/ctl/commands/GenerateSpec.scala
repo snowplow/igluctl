@@ -20,20 +20,17 @@ import io.circe.literal._
 import com.snowplowanalytics.iglu.core.{SchemaMap, SchemaVer}
 import com.snowplowanalytics.iglu.ctl.File.textFile
 import com.snowplowanalytics.iglu.ctl.SpecHelpers._
-import com.snowplowanalytics.iglu.ctl.commands.Generate.DdlOutput
 import org.specs2.Specification
 
 class GenerateSpec extends Specification { def is = s2"""
   DDL-generation command (ddl) specification
-    correctly convert com.amazon.aws.lambda/java_context_1 with default arguments $e1
-    correctly convert com.amazon.aws.lambda/java_context_1 with --raw --no-header --varchar 128 $e2
+    correctly convert com.amazon.aws.lambda/java_context_1 $e1
+    correctly convert com.amazon.aws.lambda/java_context_2 $e2
     correctly convert com.amazon.aws.ec2/instance_identity_1 with --no-header --schema snowplow $e3
-    correctly produce JSONPaths file for com.amazon.aws.cloudfront/wd_access_log_1 $e4
-    output correct warnings for DDL-generation process $e5
     warn about missing schema versions (addition) $e6
     warn about missing 1-0-0 schema version $e7
-    correctly setup table ownership $e8
     correctly create migrations from 1-0-0 to 1-0-1 $e9
+    correctly create migrations from 1-0-0 to 1-0-1 to 1-0-2 $e10
     correctly create ddl for schema with enum $e11
     correctly create ddl for schema with nested enum $e12
     correctly create ddl for schema with field without type $e13
@@ -132,7 +129,7 @@ class GenerateSpec extends Specification { def is = s2"""
       """.schema
 
     val expectedDdl =
-      """|CREATE SCHEMA IF NOT EXISTS atomic;
+      """CREATE SCHEMA IF NOT EXISTS atomic;
          |
          |CREATE TABLE IF NOT EXISTS atomic.com_amazon_aws_lambda_java_context_1 (
          |    "schema_vendor"                          VARCHAR(128)  ENCODE ZSTD NOT NULL,
@@ -166,11 +163,9 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_1 IS 'iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0';""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(input))
+    val output = Generate.transform( "atomic", NonEmptyList.of(input))
     val expected = Generate.DdlOutput(
-      List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), expectedDdl)),
-      Nil, Nil, Nil
-    )
+      List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), expectedDdl)), Nil, Nil)
     output must beEqualTo(expected)
   }
 
@@ -178,24 +173,37 @@ class GenerateSpec extends Specification { def is = s2"""
     val resultContent =
       """|CREATE SCHEMA IF NOT EXISTS atomic;
          |
-         |CREATE TABLE IF NOT EXISTS atomic.com_amazon_aws_lambda_java_context_1 (
-         |    "aws_request_id"                         VARCHAR(128) ENCODE ZSTD,
-         |    "client_context.client.app_package_name" VARCHAR(128) ENCODE ZSTD,
-         |    "client_context.client.app_title"        VARCHAR(128) ENCODE ZSTD,
-         |    "client_context.client.app_version_code" VARCHAR(128) ENCODE ZSTD,
-         |    "client_context.client.app_version_name" VARCHAR(128) ENCODE ZSTD,
-         |    "client_context.custom"                  VARCHAR(128) ENCODE ZSTD,
-         |    "client_context.environment"             VARCHAR(128) ENCODE ZSTD,
-         |    "function_name"                          VARCHAR(128) ENCODE ZSTD,
-         |    "identity.identity_id"                   VARCHAR(128) ENCODE ZSTD,
-         |    "identity.identity_pool_id"              VARCHAR(128) ENCODE ZSTD,
-         |    "log_group_name"                         VARCHAR(128) ENCODE ZSTD,
-         |    "log_stream_name"                        VARCHAR(128) ENCODE ZSTD,
-         |    "memory_limit_in_mb"                     BIGINT       ENCODE ZSTD,
-         |    "remaining_time_millis"                  BIGINT       ENCODE ZSTD
-         |);
+         |CREATE TABLE IF NOT EXISTS atomic.com_amazon_aws_lambda_java_context_2 (
+         |    "schema_vendor"                          VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_name"                            VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_format"                          VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "schema_version"                         VARCHAR(128)  ENCODE ZSTD NOT NULL,
+         |    "root_id"                                CHAR(36)      ENCODE RAW  NOT NULL,
+         |    "root_tstamp"                            TIMESTAMP     ENCODE ZSTD NOT NULL,
+         |    "ref_root"                               VARCHAR(255)  ENCODE ZSTD NOT NULL,
+         |    "ref_tree"                               VARCHAR(1500) ENCODE ZSTD NOT NULL,
+         |    "ref_parent"                             VARCHAR(255)  ENCODE ZSTD NOT NULL,
+         |    "aws_request_id"                         VARCHAR(4096) ENCODE ZSTD,
+         |    "client_context.client.app_package_name" VARCHAR(4096) ENCODE ZSTD,
+         |    "client_context.client.app_title"        VARCHAR(4096) ENCODE ZSTD,
+         |    "client_context.client.app_version_code" VARCHAR(4096) ENCODE ZSTD,
+         |    "client_context.client.app_version_name" VARCHAR(4096) ENCODE ZSTD,
+         |    "client_context.custom"                  VARCHAR(4096) ENCODE ZSTD,
+         |    "client_context.environment"             VARCHAR(4096) ENCODE ZSTD,
+         |    "function_name"                          VARCHAR(4096) ENCODE ZSTD,
+         |    "identity.identity_id"                   VARCHAR(4096) ENCODE ZSTD,
+         |    "identity.identity_pool_id"              VARCHAR(4096) ENCODE ZSTD,
+         |    "log_group_name"                         VARCHAR(4096) ENCODE ZSTD,
+         |    "log_stream_name"                        VARCHAR(4096) ENCODE ZSTD,
+         |    "memory_limit_in_mb"                     BIGINT        ENCODE ZSTD,
+         |    "remaining_time_millis"                  BIGINT        ENCODE ZSTD,
+         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+         |)
+         |DISTSTYLE KEY
+         |DISTKEY (root_id)
+         |SORTKEY (root_tstamp);
          |
-         |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_1 IS 'iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0';""".stripMargin
+         |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_2 IS 'iglu:com.amazon.aws.lambda/java_context/jsonschema/2-0-0';""".stripMargin
 
     val input = json"""
         {
@@ -205,7 +213,7 @@ class GenerateSpec extends Specification { def is = s2"""
         		"vendor":"com.amazon.aws.lambda",
         		"name":"java_context",
         		"format":"jsonschema",
-        		"version":"1-0-0"
+        		"version":"2-0-0"
          },
         	"type":"object",
         	"properties":{
@@ -286,10 +294,10 @@ class GenerateSpec extends Specification { def is = s2"""
         }
       """.schema
 
-    val output = Generate.transform(false, "atomic", 128, true, None, true)(NonEmptyList.of(input))
-    val expected = List(textFile(Paths.get("com.amazon.aws.lambda/java_context_1.sql"), resultContent))
+    val output = Generate.transform("atomic", NonEmptyList.of(input))
+    val expected = textFile(Paths.get("com.amazon.aws.lambda/java_context_2.sql"), resultContent)
 
-    output.ddls must beEqualTo(expected)
+    output.ddls.head must beEqualTo(expected)
   }
 
   def e3 = {
@@ -403,207 +411,15 @@ class GenerateSpec extends Specification { def is = s2"""
            "additionalProperties" : false
          }""".schema
 
-    val output = Generate.transform(false, "snowplow", 4096, true, None, false)(NonEmptyList.of(input))
+    val output = Generate.transform("snowplow", NonEmptyList.of(input))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.amazon.aws.ec2/instance_identity_document_1.sql"), resultContent)),
-      Nil, Nil, Nil
+      Nil, Nil
     )
 
     output must beEqualTo(expected)
   }
 
-  def e4 = {
-    val input = json"""
-         {
-         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-         	"description": "Schema for a AWS CloudFront web distribution access log event. Version released 01 Jul 2014",
-         	"self": {
-         		"vendor": "com.amazon.aws.cloudfront",
-         		"name": "wd_access_log",
-         		"format": "jsonschema",
-         		"version": "1-0-4"
-         	},
-
-         	"type": "object",
-         	"properties": {
-         		"dateTime": {
-         			"type": "string",
-         			"format": "date-time"
-         		},
-         		"xEdgeLocation": {
-         			"type": ["string", "null"],
-         			"maxLength": 32
-         		},
-         		"scBytes": {
-         			"type": ["number", "null"]
-         		},
-         		"cIp": {
-         			"type": ["string", "null"],
-         			"maxLength": 45
-         		},
-         		"csMethod": {
-         			"type": ["string", "null"],
-         			"maxLength": 3
-         		},
-         		"csHost": {
-         			"type": ["string", "null"],
-         			"maxLength": 2000
-         		},
-         		"csUriStem": {
-         			"type": ["string", "null"],
-         			"maxLength": 8192
-         		},
-         		"scStatus": {
-         			"type": ["string", "null"],
-         			"maxLength": 3
-         		},
-         		"csReferer": {
-         			"type": ["string", "null"],
-         			"maxLength": 8192
-         		},
-         		"csUserAgent": {
-         			"type": ["string", "null"],
-         			"maxLength": 2000
-         		},
-         		"csUriQuery": {
-         			"type": ["string", "null"],
-         			"maxLength": 8192
-         		},
-         		"csCookie": {
-         			"type": ["string", "null"],
-         			"maxLength": 4096
-         		},
-         		"xEdgeResultType": {
-         			"type": ["string", "null"],
-         			"maxLength": 32
-         		},
-         		"xEdgeRequestId": {
-         			"type": ["string", "null"],
-         			"maxLength": 2000
-         		},
-         		"xHostHeader": {
-         			"type": ["string", "null"],
-         			"maxLength": 2000
-         		},
-         		"csProtocol": {
-         			"enum": ["http", "https", null]
-         		},
-         		"csBytes": {
-         			"type": ["number", "null"]
-         		},
-         		"timeTaken": {
-         			"type": ["number", "null"]
-         		},
-         		"xForwardedFor": {
-         			"type": ["string", "null"],
-         			"maxLength": 45
-         		},
-         		"sslProtocol": {
-         			"type": ["string", "null"],
-         			"maxLength": 32
-         		},
-         		"sslCipher": {
-         			"type": ["string", "null"],
-         			"maxLength": 64
-         		},
-         		"xEdgeResponseResultType": {
-         			"type": ["string", "null"],
-         			"maxLength": 32
-         		}
-         	},
-         	"required": ["dateTime"],
-         	"additionalProperties": false
-         }""".schema
-
-    val resultContent =
-      """|{
-         |    "jsonpaths": [
-         |        "$.schema.vendor",
-         |        "$.schema.name",
-         |        "$.schema.format",
-         |        "$.schema.version",
-         |        "$.hierarchy.rootId",
-         |        "$.hierarchy.rootTstamp",
-         |        "$.hierarchy.refRoot",
-         |        "$.hierarchy.refTree",
-         |        "$.hierarchy.refParent",
-         |        "$.data.dateTime",
-         |        "$.data.cIp",
-         |        "$.data.csBytes",
-         |        "$.data.csCookie",
-         |        "$.data.csHost",
-         |        "$.data.csMethod",
-         |        "$.data.csProtocol",
-         |        "$.data.csReferer",
-         |        "$.data.csUriQuery",
-         |        "$.data.csUriStem",
-         |        "$.data.csUserAgent",
-         |        "$.data.scBytes",
-         |        "$.data.scStatus",
-         |        "$.data.sslCipher",
-         |        "$.data.sslProtocol",
-         |        "$.data.timeTaken",
-         |        "$.data.xEdgeLocation",
-         |        "$.data.xEdgeRequestId",
-         |        "$.data.xEdgeResponseResultType",
-         |        "$.data.xEdgeResultType",
-         |        "$.data.xForwardedFor",
-         |        "$.data.xHostHeader"
-         |    ]
-         |}""".stripMargin
-
-    val output = Generate.transform(true, "atomic", 4096, false, None, false)(NonEmptyList.of(input)).jsonPaths.head
-
-    val expected = textFile(Paths.get("com.amazon.aws.cloudfront/wd_access_log_1.json"), resultContent)
-
-    output must beEqualTo(expected)
-  }
-
-  def e5 = {
-    import com.snowplowanalytics.iglu.ctl.commands.Generate._
-    import com.snowplowanalytics.iglu.schemaddl.redshift._
-    import com.snowplowanalytics.iglu.schemaddl.redshift.generators._
-
-    val definitions = List(
-      TableDefinition("com.acme", "some_event", DdlFile(  // Definition with 2 product-type columns
-        List(
-          CommentBlock(Vector("AUTO-GENERATED BY schema-ddl DO NOT EDIT", "Generator: schema-ddl 0.2.0", "Generated: 2016-03-31 15:52")),
-          CreateTable("some_event", List(
-            Column("action", ProductType(List("warning1", "warning2"), None)),
-            Column("time_stamp", RedshiftBigInt),
-            Column("subject", ProductType(List("warning3"), None))
-          )),
-          CommentOn("some_event", "iglu:com.acme/some_event/jsonschema/1-0-0")
-        )
-      ), List()),
-
-      TableDefinition("com.acme", "some_context", DdlFile(  // Definition without warnings
-        List(
-          CommentBlock(Vector("AUTO-GENERATED BY schema-ddl DO NOT EDIT", "Generator: schema-ddl 0.2.0", "Generated: 2016-03-31 15:59")),
-          CreateTable("some_context", List(
-            Column("time_stamp", RedshiftBigInt)
-          )),
-          CommentOn("some_context", "iglu:com.acme/some_context/jsonschema/1-0-1")
-        )
-      ), List()),
-
-      TableDefinition("com.acme", "other_context_1", DdlFile( // Definition without iglu URI (impossible though)
-        List(
-          CommentBlock(Vector("AUTO-GENERATED BY schema-ddl DO NOT EDIT", "Generator: schema-ddl 0.2.0", "Generated: 2016-03-31 15:59")),
-          CreateTable("other_context", List(
-            Column("values", ProductType(List("another_warning"), None))
-          ))
-        )
-      ), List())
-    )
-
-    getDdlWarnings(definitions) must beEqualTo(List(
-      "Warning: in JSON Schema [iglu:com.acme/some_event/jsonschema/1-0-0]: warning1",
-      "Warning: in JSON Schema [iglu:com.acme/some_event/jsonschema/1-0-0]: warning2",
-      "Warning: in JSON Schema [iglu:com.acme/some_event/jsonschema/1-0-0]: warning3",
-      "Warning: in generated DDL [com.acme/other_context_1]: another_warning"
-    ))
-  }
 
   def e6 = {
     val input = NonEmptyList.of(
@@ -624,45 +440,6 @@ class GenerateSpec extends Specification { def is = s2"""
     output must beLeft(NonEmptyList.of(Common.GapError.InitMissing("com.example-agency", "cast")))
   }
 
-  def e8 = {
-    val input = json"""
-        {
-              "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-              "description": "Schema for custom contexts",
-        	     "self": {
-        	     	 "vendor": "com.acme.persons",
-        	     	 "name": "simple",
-        	     	 "format": "jsonschema",
-        	     	 "version": "1-0-0"
-        	     },
-
-              "type": "object",
-              "properties": {
-                "name": { "type": "string" },
-                "age": { "type": "number" }
-              },
-              "required":["name"]
-        }
-      """.schema
-
-    val resultContent =
-      """|CREATE SCHEMA IF NOT EXISTS atomic;
-         |
-         |CREATE TABLE IF NOT EXISTS atomic.com_acme_persons_simple_1 (
-         |    "name" VARCHAR(4096)    ENCODE ZSTD NOT NULL,
-         |    "age"  DOUBLE PRECISION ENCODE RAW
-         |);
-         |
-         |COMMENT ON TABLE atomic.com_acme_persons_simple_1 IS 'iglu:com.acme.persons/simple/jsonschema/1-0-0';
-         |
-         |ALTER TABLE atomic.com_acme_persons_simple_1 OWNER TO storageloader;""".stripMargin
-
-    val output = Generate.transform(false, "atomic", 4096, true, Some("storageloader"), true)(NonEmptyList.of(input))
-
-    val expected = List(textFile(Paths.get("com.acme.persons/simple_1.sql"), resultContent))
-
-    output.ddls must beEqualTo(expected)
-  }
 
   def e9 = {
     val initial = json"""
@@ -739,6 +516,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |--  iglu:com.acme/example/jsonschema/1-0-0
         |--  (1 row)
         |
+        |
         |BEGIN TRANSACTION;
         |
         |  ALTER TABLE atomic.com_acme_example_1
@@ -748,11 +526,10 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |END TRANSACTION;""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(initial, second))
+    val output = Generate.transform( "atomic", NonEmptyList.of(initial, second))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)),
       List(textFile(Paths.get("com.acme/example/1-0-0/1-0-1.sql"), expectedMigration)),
-      Nil,
       Nil
     )
 
@@ -796,7 +573,7 @@ class GenerateSpec extends Specification { def is = s2"""
           "properties": {
            "foo": {
              "type": "string",
-             "maxLength": 20
+              "maxLength": 20
            },
            "bar": {
              "type": "integer",
@@ -946,20 +723,20 @@ class GenerateSpec extends Specification { def is = s2"""
          |    "ref_parent"              VARCHAR(255)  ENCODE ZSTD NOT NULL,
          |    "bar"                     SMALLINT      ENCODE ZSTD,
          |    "foo"                     VARCHAR(4096) ENCODE ZSTD,
-         |    "a_field.d_field"         VARCHAR(4096) ENCODE ZSTD NOT NULL,
-         |    "a_field.b_field"         VARCHAR(4096) ENCODE ZSTD,
-         |    "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD,
+         |    "c_field"                 BIGINT        ENCODE ZSTD,
+         |    "a_field.d_field"         VARCHAR(4096) ENCODE ZSTD,
+         |    "d_field.f_field"         VARCHAR(4096) ENCODE ZSTD,
          |    "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD,
          |    "b_field"                 BIGINT        ENCODE ZSTD,
-         |    "c_field"                 BIGINT        ENCODE ZSTD,
+         |    "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD,
          |    "d_field.e_field"         VARCHAR(4096) ENCODE ZSTD,
-         |    "d_field.f_field"         VARCHAR(4096) ENCODE ZSTD,
-         |    "e_field.g_field"         VARCHAR(4096) ENCODE ZSTD NOT NULL,
-         |    "f_field"                 VARCHAR(4096) ENCODE ZSTD NOT NULL,
+         |    "a_field.b_field"         VARCHAR(4096) ENCODE ZSTD,
+         |    "e_field.g_field"         VARCHAR(4096) ENCODE ZSTD,
+         |    "f_field"                 VARCHAR(4096) ENCODE ZSTD,
          |    "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD,
          |    "e_field.f_field"         VARCHAR(4096) ENCODE ZSTD,
          |    "g_field"                 VARCHAR(4096) ENCODE ZSTD,
-        |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
+         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
         |)
         |DISTSTYLE KEY
         |DISTKEY (root_id)
@@ -976,24 +753,25 @@ class GenerateSpec extends Specification { def is = s2"""
         |--  iglu:com.acme/example/jsonschema/1-0-0
         |--  (1 row)
         |
+        |
         |BEGIN TRANSACTION;
         |
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.d_field" VARCHAR(4096) NOT NULL ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
+         |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.d_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
         |
         |  COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-1';
         |
@@ -1008,28 +786,29 @@ class GenerateSpec extends Specification { def is = s2"""
         |--  iglu:com.acme/example/jsonschema/1-0-0
         |--  (1 row)
         |
+        |
         |BEGIN TRANSACTION;
         |
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.d_field" VARCHAR(4096) NOT NULL ENCODE ZSTD;
+        |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
+        |    ADD COLUMN "a_field.d_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
+        |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
         |    ADD COLUMN "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
         |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
+        |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
         |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
+        |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "e_field.g_field" VARCHAR(4096) NOT NULL ENCODE ZSTD;
+        |    ADD COLUMN "e_field.g_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "f_field" VARCHAR(4096) NOT NULL ENCODE ZSTD;
+        |    ADD COLUMN "f_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
         |    ADD COLUMN "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
@@ -1050,12 +829,13 @@ class GenerateSpec extends Specification { def is = s2"""
         |--  iglu:com.acme/example/jsonschema/1-0-1
         |--  (1 row)
         |
+        |
         |BEGIN TRANSACTION;
         |
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "e_field.g_field" VARCHAR(4096) NOT NULL ENCODE ZSTD;
+        |    ADD COLUMN "e_field.g_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "f_field" VARCHAR(4096) NOT NULL ENCODE ZSTD;
+        |    ADD COLUMN "f_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
         |    ADD COLUMN "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD;
         |  ALTER TABLE atomic.com_acme_example_1
@@ -1067,18 +847,15 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |END TRANSACTION;""".stripMargin
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(initial, second, third))
+    val output = Generate.transform("atomic", NonEmptyList.of(initial, second, third))
     val expected = Generate.DdlOutput(
       List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)),
       List(
-        textFile(Paths.get("com.acme/example/1-0-1/1-1-0.sql"), expectedMigration3),
         textFile(Paths.get("com.acme/example/1-0-0/1-0-1.sql"), expectedMigration1),
-        textFile(Paths.get("com.acme/example/1-0-0/1-1-0.sql"), expectedMigration2)
+        textFile(Paths.get("com.acme/example/1-0-0/1-1-0.sql"), expectedMigration2),
+        textFile(Paths.get("com.acme/example/1-0-1/1-1-0.sql"), expectedMigration3)
       ),
-      Nil,
-      List(
-        "Ambiguous order in the following schemas, NonEmptyList(SchemaKey(com.acme,example,jsonschema,Full(1,0,0)), SchemaKey(com.acme,example,jsonschema,Full(1,0,1)), SchemaKey(com.acme,example,jsonschema,Full(1,1,0)))"
-      )
+      Nil
     )
 
     output must beEqualTo(expected)
@@ -1134,9 +911,9 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
 
-    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil,  Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform("atomic", NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1196,9 +973,9 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
 
-    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform( "atomic", NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1244,9 +1021,9 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
 
-    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform( "atomic", NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1287,9 +1064,9 @@ class GenerateSpec extends Specification { def is = s2"""
          |
          |COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-0';""".stripMargin
 
-    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil, Nil)
+    val expected = Generate.DdlOutput(List(textFile(Paths.get("com.acme/example_1.sql"), expectedDdl)), Nil, Nil)
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(schema))
+    val output = Generate.transform( "atomic", NonEmptyList.of(schema))
 
     output must beEqualTo(expected)
   }
@@ -1347,12 +1124,8 @@ class GenerateSpec extends Specification { def is = s2"""
         }
       """.schema
 
-    val output = Generate.transform(false, "atomic", 4096, true, None, false)(NonEmptyList.of(input1, input2))
+    val output = Generate.transform("atomic", NonEmptyList.of(input1, input2))
 
-    val expectedWarning = "Gap in the following model group schemas, NonEmptyList(SchemaKey(com.amazon.aws.lambda,java_context,jsonschema,Full(1,0,0)), SchemaKey(com.amazon.aws.lambda,java_context,jsonschema,Full(1,0,2)))"
-
-    val expected = DdlOutput(Nil, Nil, Nil, List(expectedWarning))
-
-    output must beEqualTo(expected)
+    output.warnings.head must beEqualTo("Gap in revisions between iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0 and iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-2")
   }
 }

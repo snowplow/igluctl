@@ -19,7 +19,6 @@ import io.circe._
 
 // Iglu
 import com.snowplowanalytics.iglu.core.SchemaMap
-import com.snowplowanalytics.iglu.schemaddl.{ RevisionGroup, ModelGroup }
 
 // This library
 import File.splitPath
@@ -48,26 +47,5 @@ object Utils {
     val path = getPath(jsonFile.path.toAbsolutePath)
     SchemaMap.fromPath(path).toOption.contains(schemaMap)
   }
-
-  /**
-   * Extract from Schema description four elements defining REVISION
-   *
-   * @param schemaMap Schema description
-   * @return tuple of four values defining revision
-   */
-  private[iglu] def revisionGroup(schemaMap: SchemaMap): RevisionGroup =
-    (schemaMap.schemaKey.vendor,
-      schemaMap.schemaKey.name,
-      schemaMap.schemaKey.version.model,
-      schemaMap.schemaKey.version.revision)
-
-  /**
-   * Extract from Schema description three elements defining MODEL
-   *
-   * @param schemaMap Schema description
-   * @return tuple of three values defining revision
-   */
-  private[iglu] def modelGroup(schemaMap: SchemaMap): ModelGroup =
-    (schemaMap.schemaKey.vendor, schemaMap.schemaKey.name, schemaMap.schemaKey.version.model)
 }
 
