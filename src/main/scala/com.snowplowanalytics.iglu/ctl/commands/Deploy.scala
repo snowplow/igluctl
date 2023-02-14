@@ -131,16 +131,9 @@ object Deploy {
     Decoder.instance { cursor =>
       for {
         output        <- cursor.downField("output").as[Path]
-        withJsonPaths <- cursor.downField("withJsonPaths").as[Boolean]
         dbSchema      <- cursor.downField("dbschema").as[String]
-        varcharSize   <- cursor.downField("varcharSize").as[Int]
-        noHeader      <- cursor.downField("noHeader").as[Boolean]
         force         <- cursor.downField("force").as[Boolean]
-        owner         <- cursor.downField("owner").as[String]
-      } yield Command.StaticGenerate(
-        tempPath, Some(output), dbSchema, Some(owner),
-        varcharSize, withJsonPaths, false, noHeader, force
-      )
+      } yield Command.StaticGenerate(tempPath, Some(output), dbSchema, force)
     }
 
   implicit val igluCtlActionDecoder: Decoder[IgluctlAction] =
