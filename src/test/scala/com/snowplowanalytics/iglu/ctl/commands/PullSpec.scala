@@ -19,6 +19,7 @@ import com.snowplowanalytics.iglu.ctl.Common
 import io.circe.Json
 import org.http4s.{Header, Response, Status}
 import org.specs2.Specification
+import org.typelevel.ci.CIStringSyntax
 
 class PullSpec extends Specification { def is = s2"""
   parseResponse function in Pull command
@@ -31,7 +32,7 @@ class PullSpec extends Specification { def is = s2"""
 
   def e1 = {
     val expected = Common.Error.Message("Unexpected status code 400. Response body: body.")
-    val response = Response[IO]().withStatus(Status.BadRequest).withEntity("body").withHeaders(Header("header", "header"))
+    val response = Response[IO]().withStatus(Status.BadRequest).withEntity("body").withHeaders(Header.Raw(ci"header", "header"))
     val res: IO[Either[Common.Error, List[SelfDescribingSchema[Json]]]] = Pull.parseResponse(response)
     res.unsafeRunSync() must beLeft(expected)
   }
@@ -64,7 +65,7 @@ class PullSpec extends Specification { def is = s2"""
         |]""".stripMargin
 
     val expected = Common.Error.Message("Error while parsing response: InvalidMetaschema")
-    val response = Response[IO]().withStatus(Status.Ok).withEntity(responseBodyWithInvalidSchema).withHeaders(Header("header", "header"))
+    val response = Response[IO]().withStatus(Status.Ok).withEntity(responseBodyWithInvalidSchema).withHeaders(Header.Raw(ci"header", "header"))
     val res = Pull.parseResponse(response)
 
     res.unsafeRunSync() must beLeft(expected)
@@ -96,7 +97,7 @@ class PullSpec extends Specification { def is = s2"""
         |  }
         |]""".stripMargin
 
-    val response = Response[IO]().withStatus(Status.Ok).withEntity(invalidJson).withHeaders(Header("header", "header"))
+    val response = Response[IO]().withStatus(Status.Ok).withEntity(invalidJson).withHeaders(Header.Raw(ci"header", "header"))
     val res = Pull.parseResponse(response)
 
     res.unsafeRunSync() must beLeft
@@ -132,7 +133,7 @@ class PullSpec extends Specification { def is = s2"""
         |  }
         |]""".stripMargin
 
-    val response = Response[IO]().withStatus(Status.Ok).withEntity(validResponseBody).withHeaders(Header("header", "header"))
+    val response = Response[IO]().withStatus(Status.Ok).withEntity(validResponseBody).withHeaders(Header.Raw(ci"header", "header"))
     val res = Pull.parseResponse(response)
 
     res.unsafeRunSync() must beRight

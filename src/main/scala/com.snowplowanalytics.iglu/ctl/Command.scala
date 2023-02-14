@@ -69,11 +69,6 @@ object Command {
   // static generate options
   val output = Opts.argument[Path]("output")
   val dbschema = Opts.option[String]("dbschema", "Redshift schema name", metavar = "name").withDefault("atomic")
-  val owner = Opts.option[String]("set-owner", "Redshift table owner", metavar = "name").orNone
-  val varcharSize = Opts.option[Int]("varchar-size", "Default size for varchar data type", metavar = "n").withDefault(4096)
-  val withJsonPathsOpt = Opts.flag("with-json-paths", "Produce JSON Paths files with DDL").orFalse
-  val rawMode = Opts.flag("raw-mode", "Produce raw DDL without Snowplow-specific data").orFalse
-  val noHeader = Opts.flag("no-header", "Do not place header comments into output DDL").orFalse
   val force = Opts.flag("force", "Force override existing manually-edited files").orFalse
 
   // static push options
@@ -131,8 +126,8 @@ object Command {
   val awsRole = Opts.option[String]("role", "AWS Role")
 
   // subcommands
-  val staticGenerate = Opts.subcommand("generate", "Generate DDL and JSON Path files") {
-    (input, output.orNone, dbschema, owner, varcharSize, withJsonPathsOpt, rawMode, noHeader, force).mapN(StaticGenerate.apply)
+  val staticGenerate = Opts.subcommand("generate", "Generate DDL files") {
+    (input, output.orNone, dbschema, force).mapN(StaticGenerate.apply)
   }
   val staticDeploy = Opts.subcommand("deploy", "Master command for schema deployment")(Opts.argument[Path]("config").map(StaticDeploy))
   val staticPush = Opts.subcommand("push", "Upload Schemas from folder onto the Iglu Server") {
@@ -160,15 +155,9 @@ object Command {
     (singleTableCheck.orElse(multipleTableCheck), dbSchema, dbConfig).mapN(TableCheck.apply)
   }
 
-  val tableMigrate = Opts.subcommand("table-migrate", "Create SQL statements for migrating table of schema") {
-    (singleTableCheck, dbSchema, outputS3Path, awsRole, region, dbConfig).mapN(TableMigrate.apply)
-  }
-
-  val rdbms = Opts.subcommand("rdbms", "Work with relational databases")(tableCheck.orElse(tableMigrate))
-
   val version = Opts.flag("version", "Display version").as(VersionFlag)
 
-  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(rdbms).orElse(version))
+  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(version))
 
 
   sealed trait IgluctlCommand extends Product with Serializable
@@ -177,11 +166,6 @@ object Command {
   case class StaticGenerate(input: Path,
                             output: Option[Path],
                             dbSchema: String,
-                            owner: Option[String],
-                            varcharSize: Int,
-                            withJsonPaths: Boolean,
-                            rawMode: Boolean,
-                            noHeader: Boolean,
                             force: Boolean) extends StaticCommand
   case class StaticDeploy(config: Path) extends StaticCommand
   case class StaticPush(input: Path,
@@ -224,13 +208,6 @@ object Command {
   case class TableCheck(tableCheckType: TableCheckType,
                         dbSchema: String,
                         storageConfig: DbConfig) extends IgluctlCommand
-
-  case class TableMigrate(singleTableCheck: SingleTableCheck,
-                          dbSchema: String,
-                          outputS3Path: S3Path,
-                          awsRole: String,
-                          awsRegion: String,
-                          dbConfig: DbConfig) extends IgluctlCommand
 
   case object VersionFlag extends IgluctlCommand
 

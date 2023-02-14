@@ -14,35 +14,28 @@ package com.snowplowanalytics.iglu.ctl.commands
 
 import java.nio.file.Path
 import java.util.UUID
-
 import cats.data.{EitherT, NonEmptyList}
-import cats.implicits._
 import cats.effect._
+import cats.syntax.show._
+import cats.syntax.either._
+import cats.syntax.eq._
 import cats.Show
-
 import fs2.Stream
-
 import io.circe.syntax._
 import io.circe._
-
 import com.snowplowanalytics.iglu.client.resolver.Resolver
 import com.snowplowanalytics.iglu.client.ClientError
-
 import com.snowplowanalytics.iglu.core.circe.implicits._
-import com.snowplowanalytics.iglu.core.{SchemaKey, SchemaMap, SelfDescribingSchema}
-
-import com.snowplowanalytics.iglu.schemaddl.{IgluSchema, StringUtils => SchemaDDLStringUtils}
+import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.schemaddl.IgluSchema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
-import com.snowplowanalytics.iglu.schemaddl.migrations.{SchemaList, FlatSchema}
-import com.snowplowanalytics.iglu.schemaddl.redshift.{Column => DDLColumn}
-import com.snowplowanalytics.iglu.schemaddl.redshift.generators.DdlGenerator
-
-import com.snowplowanalytics.iglu.ctl.{File, Server, Common, Storage, Command, Failing, Result => FinalResult}
+import com.snowplowanalytics.iglu.ctl.{Command, Common, Failing, File, Server, Storage, Result => FinalResult}
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.Storage.Column
 import com.snowplowanalytics.iglu.ctl.commands.TableCheck.Result._
 import org.http4s.client.Client
+import com.snowplowanalytics.iglu.schemaddl.redshift.getFinalMergedModel
 
 
 object TableCheck {
@@ -56,7 +49,7 @@ object TableCheck {
 
     case class TableMatched(schema: SchemaKey) extends Result
 
-    case class TableUnmatched(schema: SchemaKey, existingColumns: List[Column], expectedColumns: List[DDLColumn]) extends Result
+    case class TableUnmatched(schema: SchemaKey, existingColumns: List[Column], expectedColumns: List[String]) extends Result
 
     case class TableNotDeployed(schema: SchemaKey) extends Result
 
@@ -76,8 +69,8 @@ object TableCheck {
       s"Table for ${schemaKey.toSchemaUri} is matched"
     case TableUnmatched(schemaKey, existingColumns, expectedColumns) =>
       s"""|Table for ${schemaKey.toSchemaUri} is not matched
-         |  Existing columns: ${existingColumns.map(_.columnName).mkString(",")}
-         |  Expected columns: ${expectedColumns.map(_.columnName).mkString(",")}""".stripMargin
+          |  Existing columns: ${existingColumns.map(_.columnName).mkString(",")}
+          |  Expected columns: ${expectedColumns.mkString(",")}""".stripMargin
     case TableNotDeployed(schemaKey) =>
       s"Table for ${schemaKey.toSchemaUri} is not deployed"
     case CommentProblem(schemaKey, message) =>
@@ -108,7 +101,7 @@ object TableCheck {
     val stream = for {
       resolvedDbConfig <- Stream.eval(Storage.resolveDbConfig(command.storageConfig))
       storage <- Stream.resource(Storage.initialize[IO](resolvedDbConfig)).translate[IO, Failing](Common.liftIO)
-      res     <- command.tableCheckType match {
+      res <- command.tableCheckType match {
         case Command.SingleTableCheck(resolver, schema) =>
           Stream.eval(tableCheckSingle(resolver, schema, storage, command.dbSchema))
         case Command.MultipleTableCheck(igluServerUrl, apiKey) =>
@@ -126,14 +119,15 @@ object TableCheck {
     * Expected table definition is created using model group schemas of given schemaKey
     * Returns whether corresponding table is matched or not in the end
     */
-  def checkTable(storage: Storage[IO], lastVersion: SchemaKey, modelGroupSchemas: SchemaList, dbSchema: String): Failing[Result] = {
-    val tableName = SchemaDDLStringUtils.getTableName(SchemaMap(lastVersion))
+  def checkTable(storage: Storage[IO], modelGroupSchemas: NonEmptyList[IgluSchema], dbSchema: String): Failing[Result] = {
+    val model = getFinalMergedModel(modelGroupSchemas)
+    val tableName = model.tableName
     val res = for {
       existingColumns <- storage.getColumns(tableName, dbSchema)
-      comment         <- storage.getComment(tableName, dbSchema)
-      commentCheck     = checkComment(comment, lastVersion).leftMap(msg => Result.CommentProblem(lastVersion, msg))
-      expectedColumns  = buildTableDdl(modelGroupSchemas)
-      matchCheck       = checkColumns(lastVersion, existingColumns, expectedColumns)
+      comment <- storage.getComment(tableName, dbSchema)
+      lastVersion = modelGroupSchemas.last.self.schemaKey
+      commentCheck = checkComment(comment, lastVersion).leftMap(msg => Result.CommentProblem(lastVersion, msg))
+      matchCheck = checkColumns(lastVersion, existingColumns, model.columnNamesQuoted)
     } yield commentCheck.fold(identity, _ => matchCheck)
     EitherT.liftF(res)
   }
@@ -161,7 +155,7 @@ object TableCheck {
   def tableCheckSingle(resolver: Path, schemaKey: SchemaKey, storage: Storage[IO], dbschema: String)(implicit t: Timer[IO]): Failing[Result] =
     for {
       schemas <- fetchSchemaModelGroup(resolver, schemaKey)
-      res     <- checkTable(storage, schemaKey, schemas, dbschema)
+      res <- checkTable(storage, schemas, dbschema)
     } yield res
 
   /**
@@ -172,54 +166,41 @@ object TableCheck {
   def tableCheckMultiple(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], storage: Storage[IO], dbschema: String, httpClient: Client[IO]): Stream[Failing, Result] =
     for {
       schemas <- Stream.eval(getSchemas(registryRoot, readApiKey, httpClient))
-      schema <- Stream.emits[Failing, (SchemaKey, SchemaList)](schemas)
-      (schemaKey, modelGroup) = schema
-      res         <- Stream.eval(checkTable(storage, schemaKey, modelGroup, dbschema))
+      schemaList <- Stream.emit[Failing, NonEmptyList[IgluSchema]](schemas)
+      res <- Stream.eval(checkTable(storage, schemaList, dbschema))
     } yield res
 
-  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], httpClient: Client[IO]): Failing[List[(SchemaKey, SchemaList)]] = {
-    for {
-      schemas <- SchemaList.fromFetchedSchemas[IO, Common.Error](
-        {
-          for {
-            schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey), httpClient)
-            schemas     <- EitherT.fromEither[IO](Generate.parseSchemas(schemaJsons))
-            res <- EitherT.fromEither[IO](
-              NonEmptyList.fromList(schemas) match {
-                case None => (Common.Error.Message("No schema in the registry"): Common.Error).asLeft
-                case Some(nel) => nel.asRight
-              }
-            )
-          } yield res
-        }
-      )
-    } yield schemas.toList.map { e =>
-        val schemaKey = e match {
-          case s: SchemaList.Single => s.schema.self.schemaKey
-          case s: SchemaList.Full => s.schemas.last.self.schemaKey
-        }
-        (schemaKey, e)
+  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], httpClient: Client[IO]): Failing[NonEmptyList[IgluSchema]] = for {
+    schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey), httpClient)
+    schemas <- EitherT.fromEither[IO](Generate.parseSchemas(schemaJsons))
+    res <- EitherT.fromEither[IO](
+      NonEmptyList.fromList(schemas) match {
+        case None => (Common.Error.Message("No schema in the registry"): Common.Error).asLeft
+        case Some(nel) => nel.asRight
       }
-  }
+    )
+  } yield res
+
 
   /**
     * Fetches model group schemas of given schemaKey with resolver which is created
     * from given resolver config
     */
-  def fetchSchemaModelGroup(resolverPath: Path, schemaKey: SchemaKey)(implicit t: Timer[IO]): Failing[SchemaList] =
+  def fetchSchemaModelGroup(resolverPath: Path, schemaKey: SchemaKey)(implicit t: Timer[IO]): Failing[NonEmptyList[IgluSchema]] =
     for {
-      resolverJson  <- EitherT(File.readFile(resolverPath).map(_.flatMap(_.asJson)))
-      resolver      <- EitherT(Resolver.parse[IO](resolverJson.content))
+      resolverJson <- EitherT(File.readFile(resolverPath).map(_.flatMap(_.asJson)))
+      resolver <- EitherT(Resolver.parse[IO](resolverJson.content))
         .leftMap(e => Error.ConfigParseError(s"Resolver can not created: $e"))
       schemaKeyList <- EitherT(resolver.listSchemas(schemaKey.vendor, schemaKey.name, schemaKey.version.model))
         .leftMap(e => Error.ServiceError(s"Error while lookup for schema key list: ${(e: ClientError).asJson.noSpaces}"))
-      schemas       <- SchemaList.fromSchemaList(schemaKeyList, { schemaKey =>
-          for {
-            schemaJson  <- EitherT(resolver.lookupSchema(schemaKey))
-              .leftMap(e => Error.ServiceError(s"Error while lookup for schema: ${(e: ClientError).asJson.noSpaces}"))
-            schema      <- EitherT.fromEither[IO](parseSchema(schemaJson))
-          } yield schema
-        })
+      schemasNel <- EitherT.fromOption[IO](
+        NonEmptyList.fromList(schemaKeyList.schemas), Error.ServiceError(s"Error while lookup for schema family: ${schemaKey.vendor}-${schemaKey.name}-${schemaKey.version.model}"))
+      schemas <- schemasNel.traverse(schemaKey => for {
+        schemaJson <- EitherT(resolver.lookupSchema(schemaKey))
+          .leftMap(e => Error.ServiceError(s"Error while lookup for schema: ${(e: ClientError).asJson.noSpaces}"))
+        schema <- EitherT.fromEither[IO](parseSchema(schemaJson))
+      } yield schema
+      )
     } yield schemas
 
   def parseSchema(schema: Json): Either[Common.Error, IgluSchema] =
@@ -231,21 +212,15 @@ object TableCheck {
           .toRight(Common.Error.Message(s"Error while parsing schema jsons to Schema object"))
       }
 
-  /** Creates table structure with given schemas */
-  def buildTableDdl(schemas: SchemaList): List[DDLColumn] = {
-    val name = SchemaDDLStringUtils.getTableName(schemas.latest)
-    val orderedSubSchemas = FlatSchema.extractProperties(schemas)
-    DdlGenerator.generateTableDdl(orderedSubSchemas, name, None, 4096, false).columns
-  }
 
   /**
     * Compares existing and expected columns whether they are same or not.
     */
-  private[ctl] def checkColumns(schemaKey: SchemaKey, existingColumns: List[Column], expectedColumns: List[DDLColumn]): Result =
+  private[ctl] def checkColumns(schemaKey: SchemaKey, existingColumns: List[Column], expectedColumns: List[String]): Result =
     existingColumns match {
       case Nil => TableNotDeployed(schemaKey)
       case _ =>
-        expectedColumns.map(_.columnName).zipAll(existingColumns.map(_.columnName), "", "").foldLeft(List.empty[(String, String)]) {
+        expectedColumns.zipAll(existingColumns.map(_.columnName), "", "").foldLeft(List.empty[(String, String)]) {
           case (acc, (expected, existing)) =>
             if (expected != existing) (existing, expected) :: acc else acc
         } match {
