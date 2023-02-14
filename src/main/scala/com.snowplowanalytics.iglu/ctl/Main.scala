@@ -75,10 +75,7 @@ object Main extends IOApp {
 
       case Right(command: Command.TableCheck) =>
         withClient { client => TableCheck.process(command, client)}
-
-      case Right(command: Command.TableMigrate) =>
-        TableMigrate.process(command)
-
+        
       case Right(Command.VersionFlag) =>
         EitherT.fromEither[IO](List(generated.ProjectSettings.version).asRight)
 
