@@ -40,7 +40,6 @@ lazy val root = project.in(file("."))
       Libraries.http4sDsl,
       Libraries.fs2,
       Libraries.fs2Io,
-      Libraries.doobieCore,
       Libraries.logback,
       // Scala (test only)
       Libraries.specs2,

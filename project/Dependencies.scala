@@ -27,7 +27,6 @@ object Dependencies {
     val decline          = "1.4.0"
     val http4s           = "0.22.15"
     val fs2              = "2.5.9"
-    val doobie           = "0.13.4"
     val logback          = "1.2.3"
     // Scala (test only)
     val specs2           = "4.12.3"
@@ -51,7 +50,6 @@ object Dependencies {
     val http4sDsl        = "org.http4s"                 %% "http4s-dsl"                % V.http4s
     val fs2              = "co.fs2"                     %% "fs2-core"                  % V.fs2
     val fs2Io            = "co.fs2"                     %% "fs2-io"                    % V.fs2
-    val doobieCore       = "org.tpolecat"               %% "doobie-core"               % V.doobie
     val logback          = "ch.qos.logback"             % "logback-classic"            % V.logback % Runtime
     // Scala (test only)
     val specs2           = "org.specs2"                 %% "specs2-core"               % V.specs2         % "test"
