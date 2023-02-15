@@ -16,7 +16,7 @@ package com.snowplowanalytics.iglu.ctl
 import com.snowplowanalytics.iglu.core.SchemaKey
 import com.snowplowanalytics.iglu.core.SchemaVer.Full
 
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 import java.util.UUID
 
 // decline
@@ -44,7 +44,7 @@ class CommandSpec extends Specification { def is = s2"""
   def e1 = {
     val lint = Command.parse("lint .".split(" ").toList)
 
-    lint must beRight(Command.Lint(Paths.get("."), List.empty, List.empty))
+    lint must beRight(Command.Lint(Path.of("."), List.empty, List.empty))
   }
 
   def e2 = {
@@ -64,7 +64,7 @@ class CommandSpec extends Specification { def is = s2"""
   def e4 = {
     val lint = Command.parse("lint . --skip-checks unknownFormats,rootObject".split(" ").toList)
 
-    val skippedChecks = List(unknownFormats, rootObject)
+    val skippedChecks = List(rootObject, unknownFormats)
 
     lint must beRight(Command.Lint(Paths.get("."), skippedChecks, List.empty))
   }

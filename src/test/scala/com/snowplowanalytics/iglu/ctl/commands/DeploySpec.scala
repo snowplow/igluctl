@@ -36,7 +36,7 @@ class DeploySpec extends Specification { def is = s2"""
       {
         "input": "file:///input/path",
         "lint": {
-            "includedChecks": ["rootObject", "unknownFormats"],
+            "includedChecks": ["unknownFormats", "rootObject"],
             "skippedSchemas": [
               "iglu:com.acme/click/jsonschema/1-0-1"
             ]
@@ -72,7 +72,7 @@ class DeploySpec extends Specification { def is = s2"""
     val expected = IgluctlConfig(
       None,
       Command.Lint(
-        inputPath, List(Linter.unknownFormats, Linter.rootObject), List(SchemaKey("com.acme", "click", "jsonschema", Full(1,0,1)))
+        inputPath, List(Linter.rootObject, Linter.unknownFormats), List(SchemaKey("com.acme", "click", "jsonschema", Full(1,0,1)))
       ),
       Command.StaticGenerate(
         inputPath, Some(outputPath), "atomic", false

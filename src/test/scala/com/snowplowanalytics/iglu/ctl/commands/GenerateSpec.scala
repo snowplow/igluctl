@@ -723,19 +723,19 @@ class GenerateSpec extends Specification { def is = s2"""
          |    "ref_parent"              VARCHAR(255)  ENCODE ZSTD NOT NULL,
          |    "bar"                     SMALLINT      ENCODE ZSTD,
          |    "foo"                     VARCHAR(4096) ENCODE ZSTD,
-         |    "c_field"                 BIGINT        ENCODE ZSTD,
-         |    "a_field.d_field"         VARCHAR(4096) ENCODE ZSTD,
+         |    "d_field.e_field"         VARCHAR(4096) ENCODE ZSTD,
+         |    "b_field"                 BIGINT        ENCODE ZSTD,
+         |    "a_field.b_field"         VARCHAR(4096) ENCODE ZSTD,
          |    "d_field.f_field"         VARCHAR(4096) ENCODE ZSTD,
          |    "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD,
-         |    "b_field"                 BIGINT        ENCODE ZSTD,
          |    "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD,
-         |    "d_field.e_field"         VARCHAR(4096) ENCODE ZSTD,
-         |    "a_field.b_field"         VARCHAR(4096) ENCODE ZSTD,
+         |    "c_field"                 BIGINT        ENCODE ZSTD,
+         |    "a_field.d_field"         VARCHAR(4096) ENCODE ZSTD,
          |    "e_field.g_field"         VARCHAR(4096) ENCODE ZSTD,
-         |    "f_field"                 VARCHAR(4096) ENCODE ZSTD,
          |    "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD,
-         |    "e_field.f_field"         VARCHAR(4096) ENCODE ZSTD,
          |    "g_field"                 VARCHAR(4096) ENCODE ZSTD,
+         |    "f_field"                 VARCHAR(4096) ENCODE ZSTD,
+         |    "e_field.f_field"         VARCHAR(4096) ENCODE ZSTD,
          |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
         |)
         |DISTSTYLE KEY
@@ -756,22 +756,22 @@ class GenerateSpec extends Specification { def is = s2"""
         |
         |BEGIN TRANSACTION;
         |
-        |  ALTER TABLE atomic.com_acme_example_1
-         |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
          |  ALTER TABLE atomic.com_acme_example_1
-         |    ADD COLUMN "a_field.d_field" VARCHAR(4096) ENCODE ZSTD;
+         |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
          |  ALTER TABLE atomic.com_acme_example_1
          |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
          |  ALTER TABLE atomic.com_acme_example_1
          |    ADD COLUMN "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD;
          |  ALTER TABLE atomic.com_acme_example_1
-         |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
-         |  ALTER TABLE atomic.com_acme_example_1
          |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
          |  ALTER TABLE atomic.com_acme_example_1
-         |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
+         |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
          |  ALTER TABLE atomic.com_acme_example_1
-         |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
+         |    ADD COLUMN "a_field.d_field" VARCHAR(4096) ENCODE ZSTD;
         |
         |  COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-0-1';
         |
@@ -790,31 +790,31 @@ class GenerateSpec extends Specification { def is = s2"""
         |BEGIN TRANSACTION;
         |
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.d_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "e_field.g_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "f_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "e_field.f_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "g_field" VARCHAR(4096) ENCODE ZSTD;
+         |    ADD COLUMN "d_field.e_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "b_field" BIGINT ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.b_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "d_field.f_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.c_field.e_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.c_field.d_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "c_field" BIGINT ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.d_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "e_field.g_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "g_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "f_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "e_field.f_field" VARCHAR(4096) ENCODE ZSTD;
         |
         |  COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-1-0';
         |
@@ -833,15 +833,15 @@ class GenerateSpec extends Specification { def is = s2"""
         |BEGIN TRANSACTION;
         |
         |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "e_field.g_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "f_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "e_field.f_field" VARCHAR(4096) ENCODE ZSTD;
-        |  ALTER TABLE atomic.com_acme_example_1
-        |    ADD COLUMN "g_field" VARCHAR(4096) ENCODE ZSTD;
+         |    ADD COLUMN "e_field.g_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "a_field.c_field.a_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "g_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "f_field" VARCHAR(4096) ENCODE ZSTD;
+         |  ALTER TABLE atomic.com_acme_example_1
+         |    ADD COLUMN "e_field.f_field" VARCHAR(4096) ENCODE ZSTD;
         |
         |  COMMENT ON TABLE atomic.com_acme_example_1 IS 'iglu:com.acme/example/jsonschema/1-1-0';
         |
