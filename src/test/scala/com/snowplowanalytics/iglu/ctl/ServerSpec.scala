@@ -7,6 +7,7 @@ import io.circe.literal._
 import com.snowplowanalytics.iglu.core.circe.implicits._
 import org.http4s.{Header, Method}
 import org.http4s.implicits._
+import org.typelevel.ci.CIStringSyntax
 
 import java.util.UUID
 
@@ -45,7 +46,7 @@ class ServerSpec extends Specification with EventuallyMatchers {
 
       req.uri mustEqual uri"http://localhost:2000/iglu-server/api/schemas/com.acme/geo_location/jsonschema/1-0-0?isPublic=true"
       req.method must be (Method.PUT)
-      req.headers.toList must contain(Header("apikey", apikey))
+      req.headers.headers must contain(Header.Raw(ci"apikey", apikey))
     }
   }
 }

@@ -90,7 +90,7 @@ object Common {
     }
 
     def fromServer(response: Response[IO], responseString: String)(error: CirceError): Error = {
-      val headersCompact = response.headers.toList.map { header => show"${header.name}=${header.value}"}.mkString(",")
+      val headersCompact = response.headers.headers.map { header => show"${header.name}=${header.value}"}.mkString(",")
       val errorString = show"HTTP Status: ${response.status.code}; Headers: ${headersCompact.mkString(",")} Body: ${responseString}"
       error match {
         case _: ParsingFailure =>

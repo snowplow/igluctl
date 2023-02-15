@@ -101,7 +101,7 @@ object TableCheck {
     val stream = for {
       resolvedDbConfig <- Stream.eval(Storage.resolveDbConfig(command.storageConfig))
       storage <- Stream.resource(Storage.initialize[IO](resolvedDbConfig)).translate[IO, Failing](Common.liftIO)
-      res     <- command.tableCheckType match {
+      res <- command.tableCheckType match {
         case Command.SingleTableCheck(resolver, schema) =>
           Stream.eval(tableCheckSingle(resolver, schema, storage, command.dbSchema))
         case Command.MultipleTableCheck(igluServerUrl, apiKey) =>
@@ -155,7 +155,7 @@ object TableCheck {
   def tableCheckSingle(resolver: Path, schemaKey: SchemaKey, storage: Storage[IO], dbschema: String)(implicit t: Timer[IO]): Failing[Result] =
     for {
       schemas <- fetchSchemaModelGroup(resolver, schemaKey)
-      res <- checkTable(storage, schemaKey, schemas, dbschema)
+      res <- checkTable(storage, schemas, dbschema)
     } yield res
 
   /**
@@ -166,40 +166,12 @@ object TableCheck {
   def tableCheckMultiple(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], storage: Storage[IO], dbschema: String, httpClient: Client[IO]): Stream[Failing, Result] =
     for {
       schemas <- Stream.eval(getSchemas(registryRoot, readApiKey, httpClient))
-      schema <- Stream.emits[Failing, (SchemaKey, SchemaList)](schemas)
-      (schemaKey, modelGroup) = schema
-      res         <- Stream.eval(checkTable(storage, schemaKey, modelGroup, dbschema))
-      schemas <- Stream.eval(getSchemas(registryRoot, readApiKey))
       schemaList <- Stream.emit[Failing, NonEmptyList[IgluSchema]](schemas)
       res <- Stream.eval(checkTable(storage, schemaList, dbschema))
     } yield res
 
-  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], httpClient: Client[IO]): Failing[List[(SchemaKey, SchemaList)]] = {
-    for {
-      schemas <- SchemaList.fromFetchedSchemas[IO, Common.Error](
-        {
-          for {
-            schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey), httpClient)
-            schemas     <- EitherT.fromEither[IO](Generate.parseSchemas(schemaJsons))
-            res <- EitherT.fromEither[IO](
-              NonEmptyList.fromList(schemas) match {
-                case None => (Common.Error.Message("No schema in the registry"): Common.Error).asLeft
-                case Some(nel) => nel.asRight
-              }
-            )
-          } yield res
-        }
-      )
-    } yield schemas.toList.map { e =>
-        val schemaKey = e match {
-          case s: SchemaList.Single => s.schema.self.schemaKey
-          case s: SchemaList.Full => s.schemas.last.self.schemaKey
-        }
-        (schemaKey, e)
-      }
-  }
-  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID]): Failing[NonEmptyList[IgluSchema]] = for {
-    schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey))
+  def getSchemas(registryRoot: Server.HttpUrl, readApiKey: Option[UUID], httpClient: Client[IO]): Failing[NonEmptyList[IgluSchema]] = for {
+    schemaJsons <- Pull.getSchemas(Server.buildPullRequest(registryRoot, readApiKey), httpClient)
     schemas <- EitherT.fromEither[IO](Generate.parseSchemas(schemaJsons))
     res <- EitherT.fromEither[IO](
       NonEmptyList.fromList(schemas) match {

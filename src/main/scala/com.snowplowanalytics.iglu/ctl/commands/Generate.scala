@@ -20,6 +20,7 @@ import cats.implicits._
 import cats.{Monoid, Traverse}
 import io.circe._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.ctl.Command.StaticGenerate
 import com.snowplowanalytics.iglu.schemaddl.redshift._
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
@@ -49,7 +50,7 @@ object Generate {
       schemaFiles <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
       igluSchemas = parseSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       schemas <- EitherT.fromEither[IO](igluSchemas)
-      result = transform(command.dbSchema, command.schemas)
+      result = transform(command.dbSchema, schemas)
       messages <- EitherT(outputResult(output, result, command.force))
     } yield messages
   }

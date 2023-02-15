@@ -25,7 +25,7 @@ object Dependencies {
     val schemaddl        = "0.18.0-M17"
     val igluClient       = "1.3.0"
     val decline          = "1.4.0"
-    val http4s           = "0.21.33"
+    val http4s           = "0.22.15"
     val fs2              = "2.5.9"
     val doobie           = "0.13.4"
     val logback          = "1.2.3"
