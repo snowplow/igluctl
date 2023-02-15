@@ -151,7 +151,7 @@ object Generate {
         DdlOutput(List(ddl), migrations, gaps ++ failedMerges)
       }.combineAll
 
-  def migrationPath(model: ShredModel, from: SchemaKey, to: SchemaKey): Path = Path.of(model.schemaKey.vendor.toLowerCase, model.schemaKey.name.toLowerCase, from.version.asString, to.version.asString + ".sql")
+  def migrationPath(model: ShredModel, from: SchemaKey, to: SchemaKey): Path = Paths.get(model.schemaKey.vendor.toLowerCase, model.schemaKey.name.toLowerCase, from.version.asString, to.version.asString + ".sql")
   
-  def tblPath(model: ShredModel): Path = Path.of(model.schemaKey.vendor.toLowerCase, snakeCase(model.schemaKey.name) + "_" + model.schemaKey.version.model + ".sql")
+  def tblPath(model: ShredModel): Path = Paths.get(model.schemaKey.vendor.toLowerCase, snakeCase(model.schemaKey.name) + "_" + model.schemaKey.version.model + ".sql")
 }

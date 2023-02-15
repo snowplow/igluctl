@@ -142,7 +142,7 @@ object Lint {
     */
   def parseOptionalLinters(lintersString: String): Either[Error, List[Linter]] =
     validateOptionalLinters(lintersString).map { toInclude =>
-      Linter.allLintersMap.filterKeys(toInclude.contains).values.toList
+      Linter.allLintersMap.view.filterKeys(toInclude.contains).values.toList
     }.leftMap(error => Error.ConfigParseError(error))
 
   /**
@@ -182,7 +182,7 @@ object Lint {
       .map { case (linter, issues) => (linter, issues.toList) }
 
     val reports = groupedReport.map { case (linter, issues) =>
-      val longestPointer = (issues.map { case (k, _) => k.show.length } maximumOption).getOrElse(0)
+      val longestPointer = (issues.map { case (k, _) => k.show.length }.maximumOption).getOrElse(0)
       val sortedIssues = issues.sortBy { case (k, _) => (k.show, k.show.length) }
       val skipMessage = s" (add --skip-checks ${linter.getName} to omit this check)"
       def leftPad(str: String): String = str ++ (" " * (longestPointer - str.length)) ++ "\t"
