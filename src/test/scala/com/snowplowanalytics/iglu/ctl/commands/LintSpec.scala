@@ -67,7 +67,7 @@ class LintSpec extends Specification with EventuallyMatchers {
           skipSchemas = List(SchemaKey("com.acme", "signup_click","jsonschema", Full(1,0,1)))
         )
       )
-      val errorMessages = result.value.unsafeRunSync().left.get.toList
+      val errorMessages = result.value.unsafeRunSync().swap.toOption.get.toList
       eventually(errorMessages must contain(Message("All schemas provided were also skipped")))
     }
   }

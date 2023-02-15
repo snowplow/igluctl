@@ -26,7 +26,7 @@ import io.circe.parser._
 // Scala
 import scala.io.Source
 import scala.util.control.NonFatal
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import fs2._
 
@@ -238,6 +238,7 @@ object File {
     } yield result
     action.handleErrorWith {
       case NonFatal(e) => IO.pure(Error.WriteError(path, e.getMessage).asLeft)
+      case e => throw e
     }
   }
 
@@ -260,6 +261,7 @@ object File {
           Other(path).asRight
       } handleErrorWith {
       case e: SecurityException => IO(Error.ReadError(path, e.getMessage).asLeft)
+      case e => throw e
     }
   }
 
@@ -270,6 +272,7 @@ object File {
       Iterator(Error.ReadError(dir, s"Directory does not exist").asLeft)
     } handleErrorWith {
       case NonFatal(e) => IO(Iterator(Error.ReadError(dir, s"Cannot list directory: ${e.getMessage}").asLeft))
+      case e => throw e
     }
     Stream
       .eval(action)
@@ -314,6 +317,7 @@ object File {
     } yield ().asRight
     action.handleErrorWith {
       case NonFatal(e) => IO.pure(Error.WriteError(path, e.getMessage).asLeft)
+      case e => throw e
     }
   }
 
