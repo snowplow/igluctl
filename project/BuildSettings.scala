@@ -20,10 +20,6 @@ import Keys._
 
 
 object BuildSettings {
-  ThisBuild / libraryDependencySchemes ++= Seq(
-    "io.circe" %% "circe-jawn" % "always",
-    "io.circe" %% "circe-core" % "always",
-  )
 
   // Basic settings for our app
   lazy val basicSettings = Seq[Setting[_]](
@@ -31,14 +27,11 @@ object BuildSettings {
       "-deprecation",
       "-encoding", "UTF-8",
       "-feature",
+      "-Xlint:-byname-implicit",
       "-unchecked",
-      "-Ywarn-unused-import",
-      "-Ywarn-nullary-unit",
       "-Xfatal-warnings",
       "-Xlint",
-      "-language:higherKinds",
-      "-Ypartial-unification",
-      "-Xfuture"),
+      "-language:higherKinds"),
     Compile / console / scalacOptions := Seq(
       "-deprecation",
       "-encoding", "UTF-8"
@@ -52,7 +45,7 @@ object BuildSettings {
     ),
     Test / scalacOptions := Seq("-Yrangepos"),
 
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.0" cross CrossVersion.full)
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full)
   )
 
   lazy val scalifySettings = Seq(

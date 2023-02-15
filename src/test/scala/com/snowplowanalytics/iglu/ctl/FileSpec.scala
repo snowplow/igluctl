@@ -210,7 +210,7 @@ class FileSpec extends Specification { def is = s2"""
 
     val expected = Ior.both(
       NonEmptyList.of(nonConsistencyError),
-      NonEmptyList.of(schema.right.get)
+      NonEmptyList.of(schema.toOption.get)
     )
 
     File.extractResultFromJsonSchemas(jsonSchemas, mainFolderPath) must beEqualTo(expected)
@@ -246,7 +246,7 @@ class FileSpec extends Specification { def is = s2"""
 
     val expected = Ior.both(
       NonEmptyList.of(mockError1, mockError2),
-      NonEmptyList.of(schema.right.get)
+      NonEmptyList.of(schema.toOption.get)
     )
 
     File.extractResultFromJsonSchemas(jsonSchemas, mainFolderPath) must beEqualTo(expected)
@@ -292,8 +292,8 @@ class FileSpec extends Specification { def is = s2"""
 
     val expected = Ior.right(
       NonEmptyList.of(
-        schema1.right.get,
-        schema2.right.get
+        schema1.toOption.get,
+        schema2.toOption.get
       )
     )
 
