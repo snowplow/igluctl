@@ -102,29 +102,7 @@ object Command {
   // server keygen options
   val vendorPrefix = Opts.option[String]("vendor-prefix", "Vendor prefix to associate with generated key")
     .mapValidated(s => Server.VendorPrefix.fromString(s).toValidatedNel).withDefault(Server.VendorPrefix.Wildcard)
-
-  // database options
-  val dbPort = Opts.option[Int]("port", "Database port").withDefault(5439)
-  val dbHost = Opts.option[String]("host", "Database host address").orNone
-  val dbName = Opts.option[String]("dbname", "Database name").orNone
-  val dbUserName = Opts.option[String]("username", "Database username").orNone
-  val dbPassword = Opts.option[String]("password", "Database password").orNone
-  val dbConfig = (dbHost, dbPort, dbName, dbUserName, dbPassword).mapN(DbConfig.apply)
-
-  // TableCheck options
-  val igluResolver = Opts.option[Path]("resolver", "Iglu resolver config path")
-  val selfDescribingSchema = Opts.option[SchemaKey]("schema", "Schema to check against. It should have iglu:<URI> format")
-  val igluServerUrl = Opts.option[Server.HttpUrl]("server", "Iglu Server URL")
-  val igluServerApiKey = Opts.option[UUID]("apikey", "Iglu Server Read ApiKey (non master)").orNone
-  val dbSchema = Opts.option[String]("dbschema", "Database schema").withDefault("atomic")
-
-  val singleTableCheck = (igluResolver, selfDescribingSchema).mapN(SingleTableCheck.apply)
-  val multipleTableCheck = (igluServerUrl, igluServerApiKey).mapN(MultipleTableCheck.apply)
-
-  // TableMigrate options
-  val outputS3Path = Opts.option[S3Path]("output", "S3 Path for output")
-  val awsRole = Opts.option[String]("role", "AWS Role")
-
+  
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL files") {
     (input, output.orNone, dbschema, force).mapN(StaticGenerate.apply)
@@ -151,10 +129,6 @@ object Command {
   val server = Opts.subcommand("server", "Communication with Iglu Server") {
     serverKeygen
   }
-  val tableCheck = Opts.subcommand("table-check", "Check given schema's table structure against schema") {
-    (singleTableCheck.orElse(multipleTableCheck), dbSchema, dbConfig).mapN(TableCheck.apply)
-  }
-
   val version = Opts.flag("version", "Display version").as(VersionFlag)
 
   val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(version))
@@ -190,25 +164,6 @@ object Command {
                  ) extends IgluctlCommand
 
   case class ServerKeygen(server: Server.HttpUrl, masterKey: UUID, vendorPrefix: Server.VendorPrefix) extends IgluctlCommand
-
-  case class DbConfig(host: Option[String],
-                      port: Int,
-                      dbname: Option[String],
-                      username: Option[String],
-                      password: Option[String])
-
-  sealed trait TableCheckType extends Product with Serializable
-
-  case class SingleTableCheck(resolver: Path,
-                              schema: SchemaKey) extends TableCheckType
-
-  case class MultipleTableCheck(igluServerUrl: Server.HttpUrl,
-                                apiKey: Option[UUID]) extends TableCheckType
-
-  case class TableCheck(tableCheckType: TableCheckType,
-                        dbSchema: String,
-                        storageConfig: DbConfig) extends IgluctlCommand
-
   case object VersionFlag extends IgluctlCommand
 
 }
