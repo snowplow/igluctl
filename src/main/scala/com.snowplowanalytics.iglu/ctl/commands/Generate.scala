@@ -144,7 +144,9 @@ object Generate {
         val ddl = File.textFile(
           tblPath(model),
           s"CREATE SCHEMA IF NOT EXISTS $dbSchema;\n\n" +
-            model.toTableSql(dbSchema).stripTrailing().replaceAll(raw"(?m)^  ", "    ")
+            model.toTableSql(dbSchema)
+              .replaceAll("""\s+$""", "")
+              .replaceAll(raw"(?m)^  ", "    ")
         )
         val keyBounds: List[Option[SchemaKey]] = sortedKeys.map(_.some)
         val migrations = (keyBounds, keyBounds).mapN((l, h) => (l, h)).collect {
