@@ -109,33 +109,28 @@ object Generate {
     * Transform list of self-describing JSON Schemas to a single [[DdlOutput]] containing
     * all data to produce: DDL files, migrations, etc
     */
-  private[ctl] def transform(dbSchema: String, schemas: NonEmptyList[IgluSchema]): DdlOutput = {
-    schemas.groupByNem(s => (
+  private[ctl] def transform(dbSchema: String, schemas: NonEmptyList[IgluSchema]): DdlOutput =
+    schemas.groupByNem { s => (
       s.self.schemaKey.name,
       s.self.schemaKey.vendor,
       s.self.schemaKey.version.model,
-    )).toSortedMap
+    )}.toSortedMap
       .values
       .toList
-      .map(s => {
+      .map { s =>
         val lookup: collection.Map[SchemaKey, ShredModel] = foldMapMergeRedshiftSchemas(s)
         val model = getFinalMergedModel(s)
         val sortedKeys = lookup.keys.toList.sorted
-        var lastKey = sortedKeys.head
-        val gaps = sortedKeys.foldLeft(List.empty[String])(
-          (acc, k) => if (
+        val (gaps, _) = sortedKeys.foldLeft((List.empty[String], sortedKeys.head)) {
+          case ((acc, lastKey), k) => if (
             ((k.version.revision - lastKey.version.revision > 1) & (k.version.addition == lastKey.version.addition)) |
               (k.version.addition - lastKey.version.addition > 1)) {
-            val kk = lastKey
-            lastKey = k
-            acc :+ s"Gap in revisions between ${kk.toSchemaUri} and ${k.toSchemaUri}"
+            (acc :+ s"Gap in revisions between ${lastKey.toSchemaUri} and ${k.toSchemaUri}", k)
           } else {
-            lastKey = k
-            acc
+            (acc, k)
           }
-        )
+        }
 
-        lastKey = sortedKeys.head
         val failedMerges = lookup.values.toList.collect {
           case rec: ShredModel.RecoveryModel => rec.errorAsStrings.map { e =>
             s"${rec.schemaKey.toSchemaUri} has a breaking change $e"
@@ -148,16 +143,13 @@ object Generate {
               .replaceAll("""\s+$""", "")
               .replaceAll(raw"(?m)^  ", "    ")
         )
-        val keyBounds: List[Option[SchemaKey]] = sortedKeys.map(_.some)
-        val migrations = (keyBounds, keyBounds).mapN((l, h) => (l, h)).collect {
+        val migrations = (sortedKeys, sortedKeys).mapN((l, h) => (l, h)).collect {
           case (low, high) if high > low =>
-            File.textFile(migrationPath(model, low.getOrElse(sortedKeys.head), high.getOrElse(sortedKeys.last)),
-              model.migrationSql(dbSchema, low, high))
+            File.textFile(migrationPath(model, low, high),
+              model.migrationSql(dbSchema, Some(low), Some(high)))
         }
         DdlOutput(List(ddl), migrations, gaps ++ failedMerges)
-      }
-      ).combineAll
-  }
+      }.combineAll
 
   def migrationPath(model: ShredModel, from: SchemaKey, to: SchemaKey): Path = Paths.get(model.schemaKey.vendor.toLowerCase, model.schemaKey.name.toLowerCase, from.version.asString, to.version.asString + ".sql")
   
