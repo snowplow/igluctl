@@ -72,7 +72,10 @@ object Main extends IOApp {
 
       case Right(command: Command.StaticDeploy) =>
         withClient { client => Deploy.process(command, client)}
-        
+
+      case Right(command: Command.VerifyParquet) =>
+        VerifyParquet.process(command)
+
       case Right(Command.VersionFlag) =>
         EitherT.fromEither[IO](List(generated.ProjectSettings.version).asRight)
 

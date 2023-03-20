@@ -16,7 +16,7 @@ package com.snowplowanalytics.iglu.ctl
 import com.snowplowanalytics.iglu.core.SchemaKey
 import com.snowplowanalytics.iglu.core.SchemaVer.Full
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.Paths
 import java.util.UUID
 
 // decline
