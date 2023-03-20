@@ -27,12 +27,12 @@ jobs:
       - name: Zip artifact
         uses: vimtor/action-zip@v1
         with:
-          files: target/scala-2.12/igluctl
-          dest: target/scala-2.12/igluctl_${{ steps.ver.outputs.tag }}.zip
+          files: target/scala-2.13/igluctl
+          dest: target/scala-2.13/igluctl_${{ steps.ver.outputs.tag }}.zip
 
       - name: Create GitHub release & Attach artifacts
         uses: softprops/action-gh-release@v1
         with:
-          files: target/scala-2.12/igluctl_${{ steps.ver.outputs.tag }}.zip
+          files: target/scala-2.13/igluctl_${{ steps.ver.outputs.tag }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
