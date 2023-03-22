@@ -11,16 +11,16 @@ class VerifyParquetSpec extends Specification {
     "return message about breaking changes " in {
       val result = VerifyParquet.process(
         Command.VerifyParquet(
-          input = testResourcePath("schemas/verify-parquet/breaking"),
+          input = testResourcePath("verify-parquet/breaking"),
         )
       )
 
-      result.value.unsafeRunSync() must beRight(List("Breaking change between 'com.test/test/jsonschema/1-0-0' and 'com.test/test/jsonschema/1-0-1'"))
+      result.value.unsafeRunSync() must beRight(List("Breaking change introduced by 'com.test/test/jsonschema/1-0-1'. Changes: Incompatible type change String to Double at /id"))
     }
     "return message no breaking changes detected" in {
       val result = VerifyParquet.process(
         Command.VerifyParquet(
-          input = testResourcePath("schemas/verify-parquet/non-breaking"),
+          input = testResourcePath("verify-parquet/non-breaking"),
         )
       )
 

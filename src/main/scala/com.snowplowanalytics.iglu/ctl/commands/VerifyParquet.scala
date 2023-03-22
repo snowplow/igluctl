@@ -1,6 +1,6 @@
 package com.snowplowanalytics.iglu.ctl.commands
 
-import cats.Show
+import cats.{Order, Show}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
@@ -15,45 +15,61 @@ import java.nio.file.Path
 
 object VerifyParquet {
 
+  // Same vendor, name and model
+  private type SchemaFamily = NonEmptyList[SelfDescribingSchema[Schema]]
+
+  private final case class BreakingChange(source: Field, changes: List[Migrations.Breaking])
+
   def process(command: Command.VerifyParquet): Result = {
     readSchemas(command.input)
       .map(handleInputSchemas)
       .map(prepareOutputMessage)
   }
 
-  private def readSchemas(input: Path): FailingNel[List[SelfDescribingSchema[Schema]]] = {
+  private def readSchemas(input: Path): FailingNel[NonEmptyList[SelfDescribingSchema[Schema]]] = {
     EitherT(File.readSchemas(input).map(Common.leftBiasedIor))
       .flatMap { files => 
-        files.toList
+        files
           .traverse(schemaFile => toIgluSchema(schemaFile.content))
       }
   }
 
-  private def handleInputSchemas(schemas: List[SelfDescribingSchema[Schema]]) = {
-    groupSchemasByModel(schemas)
-      .map(_.sortBy(_.self.schemaKey))
+  private def handleInputSchemas(schemas: NonEmptyList[SelfDescribingSchema[Schema]]) = {
+    groupSchemasToFamilies(schemas)
+      .map(buildDdlFields)
       .flatMap(detectBreakingChanges)
   }
 
-  private def groupSchemasByModel(schemas: List[SelfDescribingSchema[Schema]]): List[List[SelfDescribingSchema[Schema]]] = {
+  private def groupSchemasToFamilies(schemas: NonEmptyList[SelfDescribingSchema[Schema]]): List[SchemaFamily] = {
     schemas
       .groupBy { schema =>
         (schema.self.schemaKey.vendor, schema.self.schemaKey.name, schema.self.schemaKey.version.model)
-      }.values.toList
+      }
+      .values
+      .toList
+      .map(_.sortBy(_.self.schemaKey))
   }
 
-  private def detectBreakingChanges(schemas: List[SelfDescribingSchema[Schema]]): List[BreakingChange] = {
-    schemas.zip(schemas.tail)
-      .filter(isBreaking)
-      .map { breakingPair =>
-        BreakingChange(breakingPair._1.self.schemaKey, breakingPair._2.self.schemaKey)
+  private def buildDdlFields(schemaFamily: SchemaFamily): NonEmptyList[Field] = {
+    schemaFamily
+      .map { schema =>
+        Field.build(schema.self.schemaKey.toPath, schema.schema, enforceValuePresence = false)
       }
   }
 
-  private def isBreaking(pair: (SelfDescribingSchema[Schema], SelfDescribingSchema[Schema])): Boolean = {
-    val source = Field.build(pair._1.self.schemaKey.toPath, pair._1.schema, enforceValuePresence = false)
-    val target = Field.build(pair._2.self.schemaKey.toPath, pair._2.schema, enforceValuePresence = false)
-    Migrations.isSchemaMigrationBreaking(source, target)
+  private def detectBreakingChanges(fields: NonEmptyList[Field]): List[BreakingChange] = {
+    def go(source: Field, pendingFields: List[Field]): List[BreakingChange] = {
+      pendingFields match {
+        case Nil => List.empty 
+        case currentTarget :: others =>
+          Migrations.mergeSchemas(source, currentTarget) match {
+            case Right(merged) => go(merged, others)
+            case Left(breakingChanges) => BreakingChange(currentTarget, breakingChanges) :: go(source, others) 
+          } 
+      }
+    }
+
+    go(fields.head, fields.tail)
   }
 
   private def toIgluSchema(schema: SelfDescribingSchema[Json]): FailingNel[SelfDescribingSchema[Schema]] =
@@ -70,12 +86,10 @@ object VerifyParquet {
       List("No breaking changes detected")
     }
   }
-
-  private final case class BreakingChange(source: SchemaKey, target: SchemaKey)
-
+  
   private implicit val breakingChangeShow: Show[BreakingChange] = Show.show { change =>
-    s"Breaking change between '${change.source.toPath}' and '${change.target.toPath}'"
+    s"Breaking change introduced by '${change.source.name}'. Changes: ${change.changes.map(_.toString).mkString("\n")}"
   }
-  private implicit val schemaKeyOrdering: Ordering[SchemaKey] = SchemaKey.ordering
+  private implicit val schemaKeyOrdering: Order[SchemaKey] = Order.fromOrdering(SchemaKey.ordering)
 
 }
