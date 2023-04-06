@@ -28,6 +28,8 @@ lazy val root = project.in(file("."))
       // Java
       Libraries.awsJava,
       Libraries.jacksonDatabind,
+      Libraries.postgresDriver,
+
       // Scala
       Libraries.circeParser,
       Libraries.circeConfig,
@@ -40,10 +42,16 @@ lazy val root = project.in(file("."))
       Libraries.http4sDsl,
       Libraries.fs2,
       Libraries.fs2Io,
+      Libraries.doobieCore,
       Libraries.logback,
       // Scala (test only)
       Libraries.specs2,
       Libraries.scalaCheck,
-      Libraries.circeLiteral
+      Libraries.circeLiteral,
+      
+      Libraries.testContainers,
+      Libraries.postgresContainer,
+      Libraries.mockServerContainer,
+      Libraries.mockServerClient,
     )
   )
