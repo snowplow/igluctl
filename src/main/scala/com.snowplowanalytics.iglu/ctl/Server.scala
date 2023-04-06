@@ -86,7 +86,7 @@ object Server {
   def deleteKey(registryRoot: Server.HttpUrl, masterApiKey: UUID, key: UUID, purpose: String, httpClient: Client[IO]): IO[Unit] = {
     val request = Request[IO]()
       .withMethod(DELETE)
-      .withUri(registryRoot.uri.addPath("/api/auth/keygen"))
+      .withUri(registryRoot.uri.addPath("api/auth/keygen"))
       .withHeaders(Header.Raw(ci"apikey", masterApiKey.toString), Header.Raw(ci"key", key.toString))
 
     httpClient.run(request).use { response: Response[IO] =>
@@ -125,7 +125,7 @@ object Server {
   def buildCreateKeysRequest(registryRoot: HttpUrl, masterApiKey: UUID, prefix: VendorPrefix): Request[IO] = {
     Request[IO]()
       .withMethod(POST)
-      .withUri(registryRoot.uri.addPath("/api/auth/keygen"))
+      .withUri(registryRoot.uri.addPath("api/auth/keygen"))
       .withHeaders(Header.Raw(ci"apikey", masterApiKey.toString))
       .withEntity(prefix)
   }
@@ -161,7 +161,7 @@ object Server {
     */
   def buildPullRequest(registryRoot: HttpUrl, optReadApiKey: Option[UUID])= {
     val uri = registryRoot.uri
-      .addPath("/api/schemas")
+      .addPath("api/schemas")
       .withQueryParam("repr", "canonical")
 
     val headers = optReadApiKey match {
