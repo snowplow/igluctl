@@ -31,6 +31,18 @@
       // Redshift database schema
       "dbschema": "atomic"
 
+      // Redshift table owner
+      "owner": "a_new_owner"
+
+      // Redshift varchar size
+      "varcharSize": 4096
+
+      // Produce JSON Paths files along with DDL
+      "withJsonPaths": true
+
+      // Whether to place header comments into output DDL
+      "noHeader": false
+
       // Allow overwriting existing manually-edited files
       "force": false
     }
