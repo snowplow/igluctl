@@ -1,3 +1,11 @@
+Version 0.11.0 (2023-04-26)
+---------------------------
+Verify more column details in table-check command (close #150) 
+Add verify-parquet command (close #148)
+Deprecate rdbms commands (close #145)
+Bump scala version to 2.13 (close #144)
+Deprecate the JSONpaths related functionality (close #141)
+
 Version 0.10.2 (2023-01-26)
 ---------------------------
 Remove info from README that is already in the Igluctl docs (#139)
