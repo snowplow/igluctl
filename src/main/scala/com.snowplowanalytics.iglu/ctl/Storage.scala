@@ -33,8 +33,14 @@ case class Storage[F[_]](xa: Transactor[F]) {
       .map(removeCommonColumns)
   }
 
-  def getComment(tableName: String)(implicit F: Bracket[F, Throwable]): F[Option[Storage.Comment]] =
-    fr"SELECT obj_description(oid) AS comment FROM pg_class WHERE relname = $tableName"
+  def getComment(tableName: String, tableSchema: String)(implicit F: Bracket[F, Throwable]): F[Option[Storage.Comment]] =
+    fr"""
+      SELECT obj_description(pg_class.oid) AS comment
+      FROM pg_class
+      INNER JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+      WHERE pg_class.relname = $tableName
+      AND pg_namespace.nspname = $tableSchema
+    """
       .query[Storage.CommentRow].option.transact(xa)
       .map(_.flatMap(_.objDescription.map(Storage.Comment)))
 

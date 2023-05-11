@@ -58,6 +58,18 @@ class TableCheckITSpec extends Specification {
             |Unmatched: 0, Matched: 1, Not Deployed: 0""".stripMargin
         ))
       }
+      "duplicated tables but in different schemas are defined in a database" in {
+        process(
+          databaseDefinition = "database/duplicated_tables.sql",
+          igluSchemas = List(testSchema(fields = """{ "char": {"type": "string"} }"""))
+        ) must beRight(List(
+          """Matched:
+            |Table for iglu:com.test/test/jsonschema/1-0-0 is matched
+            |----------------------
+            |Unmatched: 0, Matched: 1, Not Deployed: 0""".stripMargin
+        ))
+      }
+
     }
     "report unmatched table when" >> {
       "all columns and comment match, order not important, but comment is wrong version" in {

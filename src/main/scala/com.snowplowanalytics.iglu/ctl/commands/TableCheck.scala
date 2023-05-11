@@ -90,7 +90,7 @@ object TableCheck {
   
     for {
       existingColumns <- storage.getColumns(ddlModel.tableName, dbSchema)
-      existingComment <- storage.getComment(ddlModel.tableName)
+      existingComment <- storage.getComment(ddlModel.tableName, dbSchema)
       lastVersion = schemaFamily.last.self.schemaKey
     } yield verifyExistingStorage(lastVersion, existingComment, existingColumns, expectedColumns)
   }
