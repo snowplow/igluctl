@@ -148,6 +148,12 @@ class TableCheckITSpec extends Specification {
         ))
       }
     }
+    "throw doobie exception for duplicated tables but in different schemas" in {
+      process(
+        databaseDefinition = "database/duplicated_tables.sql",
+        igluSchemas = List(testSchema(fields = """{ "char": {"type": "string"} }"""))
+      ) must throwA[doobie.util.invariant.UnexpectedContinuation.type](message = "Expected ResultSet exhaustion, but more rows were available")
+    }
   }
 
   private def process(databaseDefinition: String,
