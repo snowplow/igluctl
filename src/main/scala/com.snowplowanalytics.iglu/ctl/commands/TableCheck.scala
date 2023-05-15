@@ -23,6 +23,7 @@ import com.snowplowanalytics.iglu.client.resolver.Resolver
 import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.Storage.Column
+import com.snowplowanalytics.iglu.ctl.commands.TableCheck.Result.TableIssue.ColumnIssue
 import com.snowplowanalytics.iglu.ctl.commands.TableCheck.Result._
 import com.snowplowanalytics.iglu.ctl.{Command, Common, Failing, File, Server, Storage, Result => FinalResult}
 import com.snowplowanalytics.iglu.schemaddl.IgluSchema
@@ -125,7 +126,7 @@ object TableCheck {
         
         NonEmptyList.fromList(commentIssues ::: columnIssues) match {
           case Some(discoveredIssues) =>
-            TableUnmatched(latestSchemaKey, discoveredIssues, expectedColumns, existingColumns)
+            TableUnmatched(latestSchemaKey, TableIssues(discoveredIssues, expectedColumns, existingColumns))
           case None =>
             TableMatched(latestSchemaKey) 
         }
@@ -269,20 +270,29 @@ object TableCheck {
     case class TableMatched(schema: SchemaKey) extends Result
 
     case class TableUnmatched(schema: SchemaKey,
-                              issues: NonEmptyList[TableIssue],
-                              allExpectedColumns: List[Column],
-                              allExistingColumns: List[Column]) extends Result
+                              issues: TableIssues) extends Result
 
+    final case class TableIssues(value: NonEmptyList[TableIssue],
+                                 allExpectedColumns: List[Column],
+                                 allExistingColumns: List[Column]) {
+      def hasColumnIssues: Boolean = {
+        value.exists {
+          case _: ColumnIssue => true
+          case _ => false
+        }
+      }
+    }
     sealed trait TableIssue
 
     object TableIssue {
       final case class CommentProblem(message: String) extends TableIssue
 
-      final case class ColumnMismatch(expected: Column, existing: Column) extends TableIssue
+      sealed trait ColumnIssue extends TableIssue
+      final case class ColumnMismatch(expected: Column, existing: Column) extends ColumnIssue 
 
-      final case class MissingColumnInStorage(expected: Column) extends TableIssue
+      final case class MissingColumnInStorage(expected: Column) extends ColumnIssue 
 
-      final case class AdditionalColumnInStorage(existing: Column) extends TableIssue
+      final case class AdditionalColumnInStorage(existing: Column) extends ColumnIssue 
     }
   }
 
@@ -293,15 +303,30 @@ object TableCheck {
   private implicit val tableCheckResultShow: Show[Result] = Show.show {
     case TableMatched(schemaKey) =>
       s"Table for ${schemaKey.toSchemaUri} is matched"
-    case TableUnmatched(schemaKey, issues, expected, existing) =>
-      s"""Table for ${schemaKey.toSchemaUri} is not matched. Issues:\n${issues.map(_.show).toList.mkString("\n")}
-         |-----------------
-         |Expected columns:\n${expected.map(_.show).mkString("\n")}
-         |-----------------
-         |Existing columns:\n${existing.map(_.show).mkString("\n")}
-         |""".stripMargin
+    case TableUnmatched(schemaKey, issues) =>
+      s"Table for ${schemaKey.toSchemaUri} is not matched. ${issues.show}"
     case TableNotDeployed(schemaKey) =>
       s"Table for ${schemaKey.toSchemaUri} is not deployed"
+  }
+
+  private implicit val tableIssuesShow: Show[TableIssues] = Show.show { issues =>
+    s"""Issues:\n${issues.value.map(_.show).toList.mkString("\n")}
+       |${columnListSection(issues)}
+       |""".stripMargin
+  }
+
+  private def columnListSection(issues: TableIssues): String = {
+    if (issues.hasColumnIssues)
+      s"""-----------------
+         |Expected columns:\n${issues.allExpectedColumns.show}
+         |-----------------
+         |Existing columns:\n${issues.allExistingColumns.show}""".stripMargin
+    else
+      ""
+  }
+  
+  private implicit val columnListShow: Show[List[Column]] = Show.show { columns =>
+    columns.sortBy(_.name).map(_.show).mkString("\n") 
   }
 
   private implicit val issueShow: Show[TableIssue] = Show.show {

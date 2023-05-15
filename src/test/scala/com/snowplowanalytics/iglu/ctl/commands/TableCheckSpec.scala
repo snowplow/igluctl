@@ -144,7 +144,7 @@ class TableCheckSpec extends Specification { def is =s2"""
     result: List[TableIssue]
   ) = {
     TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns) must beEqualTo(
-      Result.TableUnmatched(schemaKey, NonEmptyList.fromListUnsafe(result), expectedColumns, existingColumns)
+      Result.TableUnmatched(schemaKey, Result.TableIssues(NonEmptyList.fromListUnsafe(result), expectedColumns, existingColumns))
     ) 
   }
   

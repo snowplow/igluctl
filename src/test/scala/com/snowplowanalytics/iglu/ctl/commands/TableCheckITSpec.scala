@@ -98,32 +98,6 @@ class TableCheckITSpec extends Specification {
           """Unmatched:
             |Table for iglu:com.test/test/jsonschema/1-0-0 is not matched. Issues:
             |* Comment problem - SchemaKey found in table comment [iglu:com.test/test/jsonschema/1-0-1] does not match expected [iglu:com.test/test/jsonschema/1-0-0]
-            |-----------------
-            |Expected columns:
-            |'bigint BIGINT'
-            |'boolean BOOLEAN'
-            |'char CHAR(10)'
-            |'date DATE'
-            |'decimal_36_2 DECIMAL (36, 2)'
-            |'decimal_no_scale DECIMAL'
-            |'double DOUBLE PRECISION'
-            |'int INT'
-            |'smallint SMALLINT'
-            |'timestamp TIMESTAMP'
-            |'varchar VARCHAR(10)'
-            |-----------------
-            |Existing columns:
-            |'timestamp TIMESTAMP'
-            |'date DATE'
-            |'smallint SMALLINT'
-            |'int INT'
-            |'bigint BIGINT'
-            |'double DOUBLE PRECISION'
-            |'decimal_36_2 DECIMAL (36, 2)'
-            |'decimal_no_scale DECIMAL'
-            |'boolean BOOLEAN'
-            |'varchar VARCHAR(10)'
-            |'char CHAR(10)'
             |----------------------
             |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
         ))
@@ -155,8 +129,8 @@ class TableCheckITSpec extends Specification {
             |-----------------
             |Existing columns:
             |'only_in_storage VARCHAR(4096)'
-            |'wrong_type VARCHAR(4096)'
             |'wrong_nullability VARCHAR(4096) NOT NULL'
+            |'wrong_type VARCHAR(4096)'
             |----------------------
             |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
         ))
