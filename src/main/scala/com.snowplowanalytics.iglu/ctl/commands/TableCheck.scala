@@ -29,7 +29,8 @@ import com.snowplowanalytics.iglu.schemaddl.IgluSchema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 import com.snowplowanalytics.iglu.schemaddl.redshift.ShredModel.GoodModel
-import com.snowplowanalytics.iglu.schemaddl.redshift.getFinalMergedModel
+import com.snowplowanalytics.iglu.schemaddl.redshift.ShredModelEntry.ColumnType
+import com.snowplowanalytics.iglu.schemaddl.redshift.{ShredModelEntry, getFinalMergedModel}
 import io.circe._
 import io.circe.syntax._
 import org.http4s.client.Client
@@ -99,8 +100,17 @@ object TableCheck {
     ddlModel
       .entries
       .map { entry =>
-        Storage.Column(entry.columnName, entry.columnType, entry.isNullable)
+        Storage.Column(entry.columnName, mapProductToVarcharType(entry), entry.isNullable)
       }
+  }
+
+  private def mapProductToVarcharType(entry: ShredModelEntry): ColumnType = {
+    entry.columnType match {
+      case ColumnType.ProductType(size) => 
+        ColumnType.RedshiftVarchar(size.getOrElse(ShredModelEntry.VARCHAR_SIZE))
+      case other => 
+        other
+    }
   }
 
   private[ctl] def verifyExistingStorage(latestSchemaKey: SchemaKey,

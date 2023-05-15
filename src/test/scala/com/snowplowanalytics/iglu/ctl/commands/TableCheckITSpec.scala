@@ -47,7 +47,9 @@ class TableCheckITSpec extends Specification {
               |		"double": {"type": "number", "multipleOf": 0.001},
               |		"boolean": {"type": "boolean"},
               |		"char": {"type": "string", "minLength": 10, "maxLength": 10},
-              |		"varchar": {"type": "string", "maxLength": 10}
+              |		"varchar": {"type": "string", "maxLength": 10},
+              |		"product_4096": {"type": ["string", "number"]},
+              |		"product_bool_int": {"type": ["boolean", "integer"]}
               |	}
               |""".stripMargin))
         )

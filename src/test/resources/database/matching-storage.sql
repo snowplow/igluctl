@@ -22,7 +22,9 @@ CREATE TABLE IF NOT EXISTS atomic.com_test_test_1 (
     "decimal_no_scale" DECIMAL,
     "boolean"          BOOLEAN,
     "varchar"          VARCHAR(10),
-    "char"             CHAR(10)
+    "char"             CHAR(10),
+    "product_4096"     VARCHAR(4096),
+    "product_bool_int" VARCHAR(10)
 );
 
 COMMENT ON TABLE atomic.com_test_test_1 IS 'iglu:com.test/test/jsonschema/1-0-0';
