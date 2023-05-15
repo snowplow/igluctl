@@ -1,3 +1,7 @@
+Version 0.11.1 (2023-05-15)
+---------------------------
+Fix Redshift table check when DB has multiple tables with the same name (#152)
+
 Version 0.11.0 (2023-04-26)
 ---------------------------
 Verify more column details in table-check command (close #150) 
