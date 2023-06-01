@@ -97,7 +97,7 @@ class TableCheckITSpec extends Specification {
         result must beRight(List(
           """Unmatched:
             |Table for iglu:com.test/test/jsonschema/1-0-0 is not matched. Issues:
-            |* Comment problem - SchemaKey found in table comment [iglu:com.test/test/jsonschema/1-0-1] does not match expected [iglu:com.test/test/jsonschema/1-0-0]
+            |* Comment problem - SchemaKey found in table comment [iglu:com.test/test/jsonschema/1-0-1] does not match expected model [iglu:com.test/test/jsonschema/1-0-0]
             |----------------------
             |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
         ))
@@ -116,7 +116,7 @@ class TableCheckITSpec extends Specification {
         result must beRight(List(
           """Unmatched:
             |Table for iglu:com.test/test/jsonschema/1-0-0 is not matched. Issues:
-            |* Comment problem - SchemaKey found in table comment [iglu:com.another/test/jsonschema/1-0-0] does not match expected [iglu:com.test/test/jsonschema/1-0-0]
+            |* Comment problem - SchemaKey found in table comment [iglu:com.another/test/jsonschema/1-0-0] does not match expected model [iglu:com.test/test/jsonschema/1-0-0]
             |* Column doesn't match, expected: 'wrong_type BIGINT', actual: 'wrong_type VARCHAR(4096)'
             |* Column doesn't match, expected: 'wrong_nullability VARCHAR(4096)', actual: 'wrong_nullability VARCHAR(4096) NOT NULL'
             |* Column existing in the storage but is not defined in the schema: 'only_in_storage VARCHAR(4096)'
@@ -131,6 +131,29 @@ class TableCheckITSpec extends Specification {
             |'only_in_storage VARCHAR(4096)'
             |'wrong_nullability VARCHAR(4096) NOT NULL'
             |'wrong_type VARCHAR(4096)'
+            |----------------------
+            |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
+        ))
+      }
+      "should not match on the broken evolving schema family" in {
+        val result = process(
+          databaseDefinition = "database/broken-storage-2.sql",
+          igluSchemas = List(
+            testSchemaWrongType(fields =
+              """
+                |{
+                |   "wrong_type": { "type": "integer", "maximum": 65111 }
+                |}""".stripMargin, 0),
+            testSchemaWrongType(fields =
+            """
+              |{
+              |   "wrong_type": { "type": "integer" }
+              |}""".stripMargin, 1))
+        )
+        result must beRight(List(
+          """Unmatched:
+            |Table for iglu:com.test/test/jsonschema/1-0-1 is not matched. Issues:
+            |* Comment problem - SchemaKey found in table comment [iglu:com.test/test/jsonschema/1-0-1] does not match last schema in family [iglu:com.test/test/jsonschema/1-0-0]
             |----------------------
             |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
         ))
@@ -212,6 +235,23 @@ class TableCheckITSpec extends Specification {
        |  "properties": $fields
        |}    
        |""".stripMargin
+
+  private def testSchemaWrongType(fields: String, minor: Int): String =
+    s"""
+       |{
+       |  "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+       |  "description": "Test schema",
+       |  "self": {
+       |    "vendor": "com.test",
+       |    "name": "test",
+       |    "format": "jsonschema",
+       |    "version": "1-0-$minor"
+       |  },
+       |  "type": "object",
+       |  "properties": $fields
+       |}    
+       |""".stripMargin
+
 
 }
 
