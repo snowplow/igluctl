@@ -135,6 +135,28 @@ class TableCheckITSpec extends Specification {
             |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
         ))
       }
+      "should not match on the broken evolving schema family" in {
+        val result = process(
+          databaseDefinition = "database/broken-storage-2.sql",
+          igluSchemas = List(
+            testSchemaWrongType(fields =
+              """
+                |{
+                |   "wrong_type": { "type": "integer", "maximum": 65111 }
+                |}""".stripMargin, 0),
+            testSchemaWrongType(fields =
+            """
+              |{
+              |   "wrong_type": { "type": "integer" }
+              |}""".stripMargin, 1))
+        )
+        result must beRight(List(
+          """Unmatched:
+            |Should not match Int to Bigint is illegal
+            |----------------------
+            |Unmatched: 1, Matched: 0, Not Deployed: 0""".stripMargin
+        ))
+      }
     }
   }
 
@@ -212,6 +234,23 @@ class TableCheckITSpec extends Specification {
        |  "properties": $fields
        |}    
        |""".stripMargin
+
+  private def testSchemaWrongType(fields: String, minor: Int): String =
+    s"""
+       |{
+       |  "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+       |  "description": "Test schema",
+       |  "self": {
+       |    "vendor": "com.test",
+       |    "name": "test",
+       |    "format": "jsonschema",
+       |    "version": "1-0-$minor"
+       |  },
+       |  "type": "object",
+       |  "properties": $fields
+       |}    
+       |""".stripMargin
+
 
 }
 
