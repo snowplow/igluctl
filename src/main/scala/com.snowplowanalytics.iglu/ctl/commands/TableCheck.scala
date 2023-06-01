@@ -89,12 +89,13 @@ object TableCheck {
                          dbSchema: String): Failing[Result] = EitherT.liftF {
     val ddlModel = getFinalMergedModel(schemaFamily)
     val expectedColumns = prepareExpectedColumns(ddlModel)
-  
+
+
     for {
       existingColumns <- storage.getColumns(ddlModel.tableName, dbSchema)
       existingComment <- storage.getComment(ddlModel.tableName, dbSchema)
       lastVersion = schemaFamily.last.self.schemaKey
-    } yield verifyExistingStorage(lastVersion, existingComment, existingColumns, expectedColumns)
+    } yield verifyExistingStorage(lastVersion, existingComment, existingColumns, expectedColumns, ddlModel.schemaKey)
   }
 
   private def prepareExpectedColumns(ddlModel: GoodModel): List[Column] = {
@@ -107,9 +108,9 @@ object TableCheck {
 
   private def mapProductToVarcharType(entry: ShredModelEntry): ColumnType = {
     entry.columnType match {
-      case ColumnType.ProductType(size) => 
+      case ColumnType.ProductType(size) =>
         ColumnType.RedshiftVarchar(size.getOrElse(ShredModelEntry.VARCHAR_SIZE))
-      case other => 
+      case other =>
         other
     }
   }
@@ -117,18 +118,20 @@ object TableCheck {
   private[ctl] def verifyExistingStorage(latestSchemaKey: SchemaKey,
                                          existingComment: Option[Storage.Comment],
                                          existingColumns: List[Column],
-                                         expectedColumns: List[Column]): Result = {
+                                         expectedColumns: List[Column],
+                                         currentSchemaKey: SchemaKey
+                                        ): Result = {
     existingColumns match {
       case Nil => TableNotDeployed(latestSchemaKey)
       case _ =>
         val columnIssues = detectColumnIssues(existingColumns, expectedColumns)
-        val commentIssues = checkComment(existingComment, latestSchemaKey).toList
-        
+        val commentIssues = checkComment(existingComment, latestSchemaKey, currentSchemaKey).toList
+
         NonEmptyList.fromList(commentIssues ::: columnIssues) match {
           case Some(discoveredIssues) =>
             TableUnmatched(latestSchemaKey, TableIssues(discoveredIssues, expectedColumns, existingColumns))
           case None =>
-            TableMatched(latestSchemaKey) 
+            TableMatched(latestSchemaKey)
         }
     }
   }
@@ -175,13 +178,17 @@ object TableCheck {
   }
 
   private def checkComment(comment: Option[Storage.Comment],
-                           key: SchemaKey): Option[TableIssue.CommentProblem] = {
+                           lastSchemaKey: SchemaKey,
+                           currentSchemaKey: SchemaKey
+                          ): Option[TableIssue.CommentProblem] = {
     comment match {
       case Some(Storage.Comment(comment)) => SchemaKey.fromUri(comment) match {
-        case Right(schemaKey) if schemaKey === key  =>
+        case Right(schemaKey) if ((schemaKey === lastSchemaKey) & (schemaKey === currentSchemaKey)) =>
           None
+        case Right(schemaKey) if ((schemaKey === lastSchemaKey) & (schemaKey =!= currentSchemaKey)) =>
+          Some(TableIssue.CommentProblem(s"SchemaKey found in table comment [${schemaKey.toSchemaUri}] does not match last schema in family [${currentSchemaKey.toSchemaUri}]"))
         case Right(schemaKey) =>
-          Some(TableIssue.CommentProblem(s"SchemaKey found in table comment [${schemaKey.toSchemaUri}] does not match expected [${key.toSchemaUri}]"))
+          Some(TableIssue.CommentProblem(s"SchemaKey found in table comment [${schemaKey.toSchemaUri}] does not match expected model [${lastSchemaKey.toSchemaUri}]"))
         case Left(error) =>
           Some(TableIssue.CommentProblem(s"Invalid SchemaKey found [$comment]. ${error.code}"))
       }
@@ -282,17 +289,19 @@ object TableCheck {
         }
       }
     }
+
     sealed trait TableIssue
 
     object TableIssue {
       final case class CommentProblem(message: String) extends TableIssue
 
       sealed trait ColumnIssue extends TableIssue
-      final case class ColumnMismatch(expected: Column, existing: Column) extends ColumnIssue 
 
-      final case class MissingColumnInStorage(expected: Column) extends ColumnIssue 
+      final case class ColumnMismatch(expected: Column, existing: Column) extends ColumnIssue
 
-      final case class AdditionalColumnInStorage(existing: Column) extends ColumnIssue 
+      final case class MissingColumnInStorage(expected: Column) extends ColumnIssue
+
+      final case class AdditionalColumnInStorage(existing: Column) extends ColumnIssue
     }
   }
 
@@ -324,9 +333,9 @@ object TableCheck {
     else
       ""
   }
-  
+
   private implicit val columnListShow: Show[List[Column]] = Show.show { columns =>
-    columns.sortBy(_.name).map(_.show).mkString("\n") 
+    columns.sortBy(_.name).map(_.show).mkString("\n")
   }
 
   private implicit val issueShow: Show[TableIssue] = Show.show {

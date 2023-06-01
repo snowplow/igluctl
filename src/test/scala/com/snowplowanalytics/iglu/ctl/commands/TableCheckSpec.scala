@@ -94,7 +94,7 @@ class TableCheckSpec extends Specification { def is =s2"""
     val existingColumns = List.empty
     val expectedColumns = List(int("a"), int("b"), int("c"), int("d"), int("e"))
 
-    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns) must beEqualTo(
+    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns, schemaKey) must beEqualTo(
       Result.TableNotDeployed(schemaKey)
     )
   }
@@ -113,7 +113,7 @@ class TableCheckSpec extends Specification { def is =s2"""
       existingComment = Some(Comment("iglu:com.vendor_another/example/jsonschema/1-0-0")),
       existingColumns = List(int("a"), int("b"), int("c"), int("d"), int("e")),
       expectedColumns = List(int("a"), int("b"), int("c"), int("d"), int("e")),
-      result = List(CommentProblem("SchemaKey found in table comment [iglu:com.vendor_another/example/jsonschema/1-0-0] does not match expected [iglu:com.vendor/example/jsonschema/1-0-0]"))
+      result = List(CommentProblem("SchemaKey found in table comment [iglu:com.vendor_another/example/jsonschema/1-0-0] does not match expected model [iglu:com.vendor/example/jsonschema/1-0-0]"))
     )
   }
 
@@ -122,7 +122,7 @@ class TableCheckSpec extends Specification { def is =s2"""
     val existingColumns = List(int("a"), int("b"), int("e"), int("c"), int("d"))
     val expectedColumns = List(int("a"), int("b"), int("c"), int("d"), int("e"))
 
-    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns) must beEqualTo(
+    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns, schemaKey) must beEqualTo(
       Result.TableMatched(schemaKey)
     )
   }
@@ -132,7 +132,7 @@ class TableCheckSpec extends Specification { def is =s2"""
     val existingColumns = List(int("a"), int("b"), int("c"), int("d"), int("e"))
     val expectedColumns = List(int("a"), int("b"), int("c"), int("d"), int("e"))
 
-    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns) must beEqualTo(
+    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns, schemaKey) must beEqualTo(
       Result.TableMatched(schemaKey)
     )
   }
@@ -143,7 +143,7 @@ class TableCheckSpec extends Specification { def is =s2"""
     expectedColumns: List[Column],
     result: List[TableIssue]
   ) = {
-    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns) must beEqualTo(
+    TableCheck.verifyExistingStorage(schemaKey, existingComment, existingColumns, expectedColumns, schemaKey) must beEqualTo(
       Result.TableUnmatched(schemaKey, Result.TableIssues(NonEmptyList.fromListUnsafe(result), expectedColumns, existingColumns))
     ) 
   }
