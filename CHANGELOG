@@ -1,3 +1,7 @@
+Version 0.11.2 (2023-06-06)
+---------------------------
+Crosscheck should detect drifting schema versions when table has incorrect schema version (#162)
+
 Version 0.11.1 (2023-05-16)
 ---------------------------
 Improve table-check output (#161)
