@@ -69,6 +69,7 @@ object Command {
   // static generate options
   val output = Opts.argument[Path]("output")
   val dbschema = Opts.option[String]("dbschema", "Redshift schema name", metavar = "name").withDefault("atomic")
+  var usepostgres = Opts.flag("usepostgres", "Generate postgres migrations").orFalse
   val force = Opts.flag("force", "Force override existing manually-edited files").orFalse
 
   // static push options
@@ -127,7 +128,7 @@ object Command {
 
   // subcommands
   val staticGenerate = Opts.subcommand("generate", "Generate DDL files") {
-    (input, output.orNone, dbschema, force).mapN(StaticGenerate.apply)
+    (input, output.orNone, dbschema, usepostgres, force).mapN(StaticGenerate.apply)
   }
   val staticDeploy = Opts.subcommand("deploy", "Master command for schema deployment")(Opts.argument[Path]("config").map(StaticDeploy))
   val staticPush = Opts.subcommand("push", "Upload Schemas from folder onto the Iglu Server") {
@@ -169,6 +170,7 @@ object Command {
   case class StaticGenerate(input: Path,
                             output: Option[Path],
                             dbSchema: String,
+                            usePostgres: Boolean,
                             force: Boolean) extends StaticCommand
   case class StaticDeploy(config: Path) extends StaticCommand
   case class StaticPush(input: Path,

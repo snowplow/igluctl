@@ -47,6 +47,7 @@ class DeploySpec extends Specification { def is = s2"""
             "dbschema": "atomic",
             "varcharSize": 4096,
             "noHeader": false,
+            "usepostgres": false,
             "force": false,
             "owner": "a_new_owner"
         },
@@ -75,7 +76,7 @@ class DeploySpec extends Specification { def is = s2"""
         inputPath, List(Linter.rootObject, Linter.unknownFormats), List(SchemaKey("com.acme", "click", "jsonschema", Full(1,0,1)))
       ),
       Command.StaticGenerate(
-        inputPath, Some(outputPath), "atomic", false
+        inputPath, Some(outputPath), "atomic", false, false
       ),
       List(
         IgluctlAction.Push(Command.StaticPush(

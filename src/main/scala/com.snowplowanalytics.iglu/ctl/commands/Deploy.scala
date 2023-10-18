@@ -132,8 +132,9 @@ object Deploy {
       for {
         output        <- cursor.downField("output").as[Path]
         dbSchema      <- cursor.downField("dbschema").as[String]
+        usePostgres   <- cursor.downField("usepostgres").as[Boolean]
         force         <- cursor.downField("force").as[Boolean]
-      } yield Command.StaticGenerate(tempPath, Some(output), dbSchema, force)
+      } yield Command.StaticGenerate(tempPath, Some(output), dbSchema, usePostgres, force)
     }
 
   implicit val igluCtlActionDecoder: Decoder[IgluctlAction] =

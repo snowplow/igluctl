@@ -50,7 +50,7 @@ object Generate {
       schemaFiles <- EitherT(File.readSchemas(command.input).map(Common.leftBiasedIor))
       igluSchemas = parseSchemas(schemaFiles.map(_.content)).leftMap(NonEmptyList.one)
       schemas <- EitherT.fromEither[IO](igluSchemas)
-      result = transform(command.dbSchema, schemas)
+      result = transform(command.dbSchema, command.usePostgres, schemas)
       messages <- EitherT(outputResult(output, result, command.force))
     } yield messages
   }
@@ -70,6 +70,19 @@ object Generate {
       Schema.parse(s.schema).map(e => SelfDescribingSchema(s.self, e))
     }.toRight(Common.Error.Message("Error while parsing schema jsons to Schema object"))
 
+
+  def createSchemaSql(schemaName: String): String = s"CREATE SCHEMA IF NOT EXISTS $schemaName;" 
+
+
+  def redshiftToPostgresSql(sql: String): String = {
+    sql
+      .replaceAll("ENCODE ZSTD", "")
+      .replaceAll("ENCODE RAW", "")
+      .replaceAll("DISTSTYLE KEY", "")
+      .replaceAll("DISTKEY \\([^)]+\\)", "")
+      .replaceAll("SORTKEY \\([^)]+\\)", "")
+      .trim
+  }
 
   /**
     * Class holding an aggregated output ready to be written
@@ -109,7 +122,7 @@ object Generate {
     * Transform list of self-describing JSON Schemas to a single [[DdlOutput]] containing
     * all data to produce: DDL files, migrations, etc
     */
-  private[ctl] def transform(dbSchema: String, schemas: NonEmptyList[IgluSchema]): DdlOutput =
+  private[ctl] def transform(dbSchema: String, usePostgres: Boolean, schemas: NonEmptyList[IgluSchema]): DdlOutput =
     schemas.groupByNem { s => (
       s.self.schemaKey.name,
       s.self.schemaKey.vendor,
@@ -138,15 +151,15 @@ object Generate {
         }.flatten
         val ddl = File.textFile(
           tblPath(model),
-          s"CREATE SCHEMA IF NOT EXISTS $dbSchema;\n\n" +
-            model.toTableSql(dbSchema)
+          createSchemaSql(dbSchema) + "\n\n" +
+          (if (usePostgres) redshiftToPostgresSql(model.toTableSql(dbSchema)) else model.toTableSql(dbSchema))
               .replaceAll("""\s+$""", "")
               .replaceAll(raw"(?m)^  ", "    ")
         )
         val migrations = (sortedKeys, sortedKeys).mapN((l, h) => (l, h)).collect {
           case (low, high) if high > low =>
-            File.textFile(migrationPath(model, low, high),
-              model.migrationSql(dbSchema, Some(low), Some(high)))
+            val migrationSql = if (usePostgres) redshiftToPostgresSql(model.migrationSql(dbSchema, Some(low), Some(high))) else model.migrationSql(dbSchema, Some(low), Some(high))
+File.textFile(migrationPath(model, low, high), migrationSql)
         }
         DdlOutput(List(ddl), migrations, gaps ++ failedMerges)
       }.combineAll
