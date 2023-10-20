@@ -92,6 +92,8 @@ object Generate {
 
       // Remove Redshift loader specific columns
       .replaceAll("(?i)\\s*\"ref_(root|tree|parent)\"[^\n]*", "")
+      // Remove FOREIGN KEY due to lack of uniqueness constraint on event_id
+      .replaceAll(",\\s*\n\\s*FOREIGN KEY \\(root_id\\) REFERENCES[^\n]*\n", "\n")
       .trim
   }
 
