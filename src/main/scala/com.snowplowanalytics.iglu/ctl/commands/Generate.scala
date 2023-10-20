@@ -81,6 +81,17 @@ object Generate {
       .replaceAll("DISTSTYLE KEY", "")
       .replaceAll("DISTKEY \\([^)]+\\)", "")
       .replaceAll("SORTKEY \\([^)]+\\)", "")
+      .replaceAll("CHAR\\(36\\)", "UUID")  // Replace CHAR(36) with UUID
+      .replaceAll("DOUBLE PRECISION", "FLOAT8")  // Replace DOUBLE PRECISION with FLOAT8
+
+      .replaceAll("BYTEINT", "SMALLINT")  // Convert BYTEINT to SMALLINT
+      .replaceAll("VARCHAR\\(MAX\\)", "TEXT")  // Convert VARCHAR(MAX) to TEXT
+      .replaceAll("VARBINARY\\(MAX\\)", "BYTEA")  // Convert VARBINARY(MAX) to BYTEA
+      .replaceAll("DATETIME", "TIMESTAMP")  // Convert DATETIME to TIMESTAMP
+      .replaceAll("TINYINT", "SMALLINT")  // Convert TINYINT to SMALLINT
+
+      // Remove Redshift loader specific columns
+      .replaceAll("(?i)\\s*\"ref_(root|tree|parent)\"[^\n]*", "")
       .trim
   }
 
