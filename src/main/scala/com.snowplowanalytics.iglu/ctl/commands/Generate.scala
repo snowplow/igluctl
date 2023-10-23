@@ -76,8 +76,8 @@ object Generate {
 
   def redshiftToPostgresSql(sql: String): String = {
     sql
-      .replaceAll("ENCODE ZSTD", "")
-      .replaceAll("ENCODE RAW", "")
+      .replaceAll(" ENCODE ZSTD", "")
+      .replaceAll(" ENCODE RAW", "")
       .replaceAll("DISTSTYLE KEY", "")
       .replaceAll("DISTKEY \\([^)]+\\)", "")
       .replaceAll("SORTKEY \\([^)]+\\)", "")

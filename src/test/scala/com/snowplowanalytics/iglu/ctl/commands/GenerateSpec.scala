@@ -133,26 +133,26 @@ class GenerateSpec extends Specification { def is = s2"""
       """CREATE SCHEMA IF NOT EXISTS atomic;
          |
          |CREATE TABLE IF NOT EXISTS atomic.com_amazon_aws_lambda_java_context_postgres_1 (
-         |    "schema_vendor"                          VARCHAR(128)   NOT NULL,
-         |    "schema_name"                            VARCHAR(128)   NOT NULL,
-         |    "schema_format"                          VARCHAR(128)   NOT NULL,
-         |    "schema_version"                         VARCHAR(128)   NOT NULL,
-         |    "root_id"                                UUID        NOT NULL,
-         |    "root_tstamp"                            TIMESTAMP      NOT NULL,
-         |    "aws_request_id"                         VARCHAR(4096) ,
-         |    "client_context.client.app_package_name" VARCHAR(4096) ,
-         |    "client_context.client.app_title"        VARCHAR(4096) ,
-         |    "client_context.client.app_version_code" VARCHAR(4096) ,
-         |    "client_context.client.app_version_name" VARCHAR(4096) ,
-         |    "client_context.custom"                  VARCHAR(4096) ,
-         |    "client_context.environment"             VARCHAR(4096) ,
-         |    "function_name"                          VARCHAR(4096) ,
-         |    "identity.identity_id"                   VARCHAR(4096) ,
-         |    "identity.identity_pool_id"              VARCHAR(4096) ,
-         |    "log_group_name"                         VARCHAR(4096) ,
-         |    "log_stream_name"                        VARCHAR(4096) ,
-         |    "memory_limit_in_mb"                     BIGINT        ,
-         |    "remaining_time_millis"                  BIGINT        
+         |    "schema_vendor"                          VARCHAR(128)  NOT NULL,
+         |    "schema_name"                            VARCHAR(128)  NOT NULL,
+         |    "schema_format"                          VARCHAR(128)  NOT NULL,
+         |    "schema_version"                         VARCHAR(128)  NOT NULL,
+         |    "root_id"                                UUID       NOT NULL,
+         |    "root_tstamp"                            TIMESTAMP     NOT NULL,
+         |    "aws_request_id"                         VARCHAR(4096),
+         |    "client_context.client.app_package_name" VARCHAR(4096),
+         |    "client_context.client.app_title"        VARCHAR(4096),
+         |    "client_context.client.app_version_code" VARCHAR(4096),
+         |    "client_context.client.app_version_name" VARCHAR(4096),
+         |    "client_context.custom"                  VARCHAR(4096),
+         |    "client_context.environment"             VARCHAR(4096),
+         |    "function_name"                          VARCHAR(4096),
+         |    "identity.identity_id"                   VARCHAR(4096),
+         |    "identity.identity_pool_id"              VARCHAR(4096),
+         |    "log_group_name"                         VARCHAR(4096),
+         |    "log_stream_name"                        VARCHAR(4096),
+         |    "memory_limit_in_mb"                     BIGINT       ,
+         |    "remaining_time_millis"                  BIGINT       
          |)
          |
          |
