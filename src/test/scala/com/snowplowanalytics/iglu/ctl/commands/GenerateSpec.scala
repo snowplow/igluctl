@@ -24,6 +24,7 @@ import org.specs2.Specification
 
 class GenerateSpec extends Specification { def is = s2"""
   DDL-generation command (ddl) specification
+    correctly convert com.amazon.aws.lambda/java_context_1_postgres $e1Postgres
     correctly convert com.amazon.aws.lambda/java_context_1 $e1
     correctly convert com.amazon.aws.lambda/java_context_2 $e2
     correctly convert com.amazon.aws.ec2/instance_identity_1 with --no-header --schema snowplow $e3
@@ -37,6 +38,133 @@ class GenerateSpec extends Specification { def is = s2"""
     correctly create ddl for empty schema $e14
     warn about missing schema in the transformSnowplow $e15
   """
+
+  def e1Postgres = {
+    val input = json"""
+        {
+        	"$$schema":"http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        	"description":"Schema for an AWS Lambda Java context object, http://docs.aws.amazon.com/lambda/latest/dg/java-context-object.html",
+        	"self":{
+        		"vendor":"com.amazon.aws.lambda",
+        		"name":"java_context_postgres",
+        		"version":"1-0-0",
+        		"format":"jsonschema"
+        	},
+        	"type":"object",
+        	"properties":{
+        		"functionName":{
+        			"type":"string"
+        		},
+        		"logStreamName":{
+        			"type":"string"
+        		},
+        		"awsRequestId":{
+        			"type":"string"
+        		},
+        		"remainingTimeMillis":{
+        			"type":"integer",
+        			"minimum":0
+        		},
+        		"logGroupName":{
+        			"type":"string"
+        		},
+        		"memoryLimitInMB":{
+        			"type":"integer",
+        			"minimum":0
+        		},
+        		"clientContext":{
+        			"type":"object",
+        			"properties":{
+        				"client":{
+        					"type":"object",
+        					"properties":{
+        						"appTitle":{
+        							"type":"string"
+        						},
+        						"appVersionName":{
+        							"type":"string"
+        						},
+        						"appVersionCode":{
+        							"type":"string"
+        						},
+        						"appPackageName":{
+        							"type":"string"
+        						}
+        					},
+        					"additionalProperties":false
+        				},
+        				"custom":{
+        					"type":"object",
+        					"patternProperties":{
+        						".*":{
+        							"type":"string"
+        						}
+        					}
+        				},
+        				"environment":{
+        					"type":"object",
+        					"patternProperties":{
+        						".*":{
+        							"type":"string"
+        						}
+        					}
+        				}
+        			},
+        			"additionalProperties":false
+        		},
+        		"identity":{
+        			"type":"object",
+        			"properties":{
+        				"identityId":{
+        					"type":"string"
+        				},
+        				"identityPoolId":{
+        					"type":"string"
+        				}
+        			},
+        			"additionalProperties":false
+        		}
+        	},
+        	"additionalProperties":false
+        }
+      """.schema
+
+    val expectedDdl =
+      """CREATE SCHEMA IF NOT EXISTS atomic;
+         |
+         |CREATE TABLE IF NOT EXISTS atomic.com_amazon_aws_lambda_java_context_postgres_1 (
+         |    "schema_vendor"                          VARCHAR(128)   NOT NULL,
+         |    "schema_name"                            VARCHAR(128)   NOT NULL,
+         |    "schema_format"                          VARCHAR(128)   NOT NULL,
+         |    "schema_version"                         VARCHAR(128)   NOT NULL,
+         |    "root_id"                                UUID        NOT NULL,
+         |    "root_tstamp"                            TIMESTAMP      NOT NULL,
+         |    "aws_request_id"                         VARCHAR(4096) ,
+         |    "client_context.client.app_package_name" VARCHAR(4096) ,
+         |    "client_context.client.app_title"        VARCHAR(4096) ,
+         |    "client_context.client.app_version_code" VARCHAR(4096) ,
+         |    "client_context.client.app_version_name" VARCHAR(4096) ,
+         |    "client_context.custom"                  VARCHAR(4096) ,
+         |    "client_context.environment"             VARCHAR(4096) ,
+         |    "function_name"                          VARCHAR(4096) ,
+         |    "identity.identity_id"                   VARCHAR(4096) ,
+         |    "identity.identity_pool_id"              VARCHAR(4096) ,
+         |    "log_group_name"                         VARCHAR(4096) ,
+         |    "log_stream_name"                        VARCHAR(4096) ,
+         |    "memory_limit_in_mb"                     BIGINT        ,
+         |    "remaining_time_millis"                  BIGINT        
+         |)
+         |
+         |
+         |;
+         |
+         |COMMENT ON TABLE atomic.com_amazon_aws_lambda_java_context_postgres_1 IS 'iglu:com.amazon.aws.lambda/java_context_postgres/jsonschema/1-0-0';""".stripMargin
+
+    val output = Generate.transform( "atomic", true, NonEmptyList.of(input))
+    val expected = Generate.DdlOutput(
+      List(textFile(Paths.get("com.amazon.aws.lambda/java_context_postgres_1.sql"), expectedDdl)), Nil, Nil)
+    output must beEqualTo(expected)
+  }
 
   def e1 = {
     val input = json"""
