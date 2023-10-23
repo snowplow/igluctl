@@ -72,6 +72,16 @@ class GenerateSpec extends Specification { def is = s2"""
         			"type":"integer",
         			"minimum":0
         		},
+            "instanceId" : {
+              "type" : "string",
+              "minLength" : 10,
+              "maxLength" : 36
+            },
+            "imageId" : {
+              "type" : "string",
+              "minLength" : 36,
+              "maxLength" : 36
+            },
         		"clientContext":{
         			"type":"object",
         			"properties":{
@@ -137,7 +147,7 @@ class GenerateSpec extends Specification { def is = s2"""
          |    "schema_name"                            VARCHAR(128)  NOT NULL,
          |    "schema_format"                          VARCHAR(128)  NOT NULL,
          |    "schema_version"                         VARCHAR(128)  NOT NULL,
-         |    "root_id"                                UUID       NOT NULL,
+         |    "root_id"                                UUID          NOT NULL,
          |    "root_tstamp"                            TIMESTAMP     NOT NULL,
          |    "aws_request_id"                         VARCHAR(4096),
          |    "client_context.client.app_package_name" VARCHAR(4096),
@@ -149,6 +159,8 @@ class GenerateSpec extends Specification { def is = s2"""
          |    "function_name"                          VARCHAR(4096),
          |    "identity.identity_id"                   VARCHAR(4096),
          |    "identity.identity_pool_id"              VARCHAR(4096),
+         |    "image_id"                               UUID        ,
+         |    "instance_id"                            VARCHAR(36)  ,
          |    "log_group_name"                         VARCHAR(4096),
          |    "log_stream_name"                        VARCHAR(4096),
          |    "memory_limit_in_mb"                     BIGINT       ,
