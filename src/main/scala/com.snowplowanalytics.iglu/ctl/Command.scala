@@ -145,8 +145,11 @@ object Command {
   val staticVerifyParquet = Opts.subcommand("verify-parquet", "Detect breaking changes between JSON schemas following rule for parquet data format") {
     input.map(VerifyParquet.apply)
   }
+  val staticVerifyRedshift = Opts.subcommand("verify-redshift", "Detect breaking changes between JSON schemas for Redshift") {
+    (igluServerUrl, igluServerApiKey).mapN(VerifyRedshift.apply)
+  }
   val static = Opts.subcommand("static", "Work with static registry") {
-    staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull).orElse(staticVerifyParquet)
+    staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull).orElse(staticVerifyParquet).orElse(staticVerifyRedshift)
   }
   val lint = Opts.subcommand("lint", "Validate JSON schemas") {
     (input, skipChecks, skipSchemas).mapN(Lint.apply)
@@ -189,6 +192,8 @@ object Command {
 
   case class VerifyParquet(input: Path) extends StaticCommand
 
+  case class VerifyRedshift(igluServerUrl: Server.HttpUrl, apiKey: Option[UUID]) extends StaticCommand
+
   case class Lint(input: Path,
                   skipChecks: List[Linter],
                   skipSchemas: List[SchemaKey]
@@ -213,6 +218,7 @@ object Command {
   case class TableCheck(tableCheckType: TableCheckType,
                         dbSchema: String,
                         storageConfig: DbConfig) extends IgluctlCommand
+
 
   case object VersionFlag extends IgluctlCommand
 
