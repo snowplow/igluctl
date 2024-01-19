@@ -118,9 +118,9 @@ object Generate {
       .values
       .toList
       .map { s =>
-        val lookup: collection.Map[SchemaKey, ShredModel] = foldMapMergeRedshiftSchemas(s)
-        val model = getFinalMergedModel(s)
-        val sortedKeys = lookup.keys.toList.sorted
+        val lookup: MergeRedshiftSchemasResult = foldMapMergeRedshiftSchemas(s)
+        val model = lookup.goodModel
+        val sortedKeys = s.map(_.self.schemaKey).toList.sorted
         val (gaps, _) = sortedKeys.foldLeft((List.empty[String], sortedKeys.head)) {
           case ((acc, lastKey), k) => if (
             ((k.version.revision - lastKey.version.revision > 1) & (k.version.addition == lastKey.version.addition)) |
@@ -131,11 +131,11 @@ object Generate {
           }
         }
 
-        val failedMerges = lookup.values.toList.collect {
-          case rec: ShredModel.RecoveryModel => rec.errorAsStrings.map { e =>
+        val failedMerges = lookup.recoveryModels.values.toList.flatMap { rec =>
+          rec.errorAsStrings.map { e =>
             s"${rec.schemaKey.toSchemaUri} has a breaking change $e"
           }.toList
-        }.flatten
+        }
         val ddl = File.textFile(
           tblPath(model),
           s"CREATE SCHEMA IF NOT EXISTS $dbSchema;\n\n" +
