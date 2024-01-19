@@ -6,7 +6,6 @@ import cats.effect.IO
 
 import com.snowplowanalytics.iglu.core.SchemaCriterion
 import com.snowplowanalytics.iglu.schemaddl.redshift._
-import com.snowplowanalytics.iglu.schemaddl.redshift.ShredModel.RecoveryModel
 
 import org.http4s.client.Client
 
@@ -24,11 +23,9 @@ object VerifyRedshift {
   }
 
   private def verifyFamily(schemaFamily: SchemaFamily):  Option[SchemaCriterion] = {
-    val recoveryModels = foldMapMergeRedshiftSchemas(schemaFamily).values.collect {
-      case model: RecoveryModel => model
-    }
+    val recoveryModels = foldMapMergeRedshiftSchemas(schemaFamily).recoveryModels
     if (recoveryModels.nonEmpty) {
-      val key = recoveryModels.head.schemaKey
+      val key = recoveryModels.head._1
       SchemaCriterion(key.vendor, key.name, key.format, key.version.model).some
     } else None
   }
