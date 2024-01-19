@@ -15,7 +15,7 @@ For complete documentation on Igluctl please refer to the [technical documentati
 
 ## Copyright and License
 
-Igluctl is copyright 2016-2022 Snowplow Analytics Ltd.
+Igluctl is copyright 2016-2024 Snowplow Analytics Ltd.
 
 Licensed under the **[Apache License, Version 2.0][license]** (the "License");
 you may not use this software except in compliance with the License.
