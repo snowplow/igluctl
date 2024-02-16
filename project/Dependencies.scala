@@ -22,7 +22,7 @@ object Dependencies {
     val circe            = "0.14.3"
     val circeConfig      = "0.10.0"
     val catsEffect       = "2.5.3"
-    val schemaddl        = "0.22.0"
+    val schemaddl        = "0.22.1"
     val igluClient       = "1.3.0"
     val decline          = "1.4.0"
     val http4s           = "0.22.15"
