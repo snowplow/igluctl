@@ -12,6 +12,8 @@
  */
 package com.snowplowanalytics.iglu.ctl
 
+import cats.implicits._
+
 // java
 import com.snowplowanalytics.iglu.core.SchemaKey
 import com.snowplowanalytics.iglu.core.SchemaVer.Full
@@ -39,6 +41,9 @@ class CommandSpec extends Specification { def is = s2"""
     extracts static pull command class when apikey is not given $e6
     extracts static pull command class when apikey is given $e7
     extracts lint command class (--skip-schemas) $e8
+    extracts verify parquet command $e9
+    extracts verify redshift command without apikey $e10
+    extracts verify redshift command with apikey $e11
   """
 
   def e1 = {
@@ -98,5 +103,25 @@ class CommandSpec extends Specification { def is = s2"""
     val skippedSchemas = List(SchemaKey("com.pagerduty", "incident", "jsonschema", Full(1,0,0)), SchemaKey("com.mparticle.snowplow", "app_event", "jsonschema", Full(1,0,0)))
 
     lint must beRight(Command.Lint(Paths.get("."), List.empty, skippedSchemas))
+  }
+
+  def e9 = {
+    val verify = Command.parse("verify parquet /tmp/snowplow".split(" ").toList)
+
+    verify must beRight(Command.VerifyParquet(Paths.get("/tmp/snowplow")))
+  }
+
+  def e10 = {
+    val verify = Command.parse("verify redshift --server http://localhost:8080".split(" ").toList)
+    val url = Server.HttpUrl.parse("http://localhost:8080").getOrElse(throw new RuntimeException("Invalid URI"))
+
+    verify must beRight(Command.VerifyRedshift(url, None))
+  }
+
+  def e11 = {
+    val verify = Command.parse("verify redshift --server http://localhost:8080 --apikey e82d494f-ba11-4206-b78a-d2aaedeeab44".split(" ").toList)
+    val url = Server.HttpUrl.parse("http://localhost:8080").getOrElse(throw new RuntimeException("Invalid URI"))
+
+    verify must beRight(Command.VerifyRedshift(url, UUID.fromString("e82d494f-ba11-4206-b78a-d2aaedeeab44").some))
   }
 }

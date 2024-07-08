@@ -142,14 +142,19 @@ object Command {
   val serverKeygen = Opts.subcommand("keygen", "Generate API key on remote Iglu Server") {
     (registryRoot, apikey, vendorPrefix).mapN(ServerKeygen.apply)
   }
-  val staticVerifyParquet = Opts.subcommand("verify-parquet", "Detect breaking changes between JSON schemas following rule for parquet data format") {
+  val verifyParquet = Opts.subcommand("parquet", "Detect breaking changes between JSON schemas following rule for parquet data format") {
     input.map(VerifyParquet.apply)
   }
-  val staticVerifyRedshift = Opts.subcommand("verify-redshift", "Detect breaking changes between JSON schemas for Redshift") {
+  val verifyRedshift = Opts.subcommand("redshift", "Detect breaking changes between JSON schemas for Redshift") {
     (igluServerUrl, igluServerApiKey).mapN(VerifyRedshift.apply)
   }
+
+  val verify = Opts.subcommand("verify", "Detect breaking changes between JSON schemas for different targets") {
+    verifyParquet.orElse(verifyRedshift)
+  }
+
   val static = Opts.subcommand("static", "Work with static registry") {
-    staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull).orElse(staticVerifyParquet).orElse(staticVerifyRedshift)
+    staticGenerate.orElse(staticDeploy).orElse(staticPush).orElse(staticS3Cp).orElse(staticPull)
   }
   val lint = Opts.subcommand("lint", "Validate JSON schemas") {
     (input, skipChecks, skipSchemas).mapN(Lint.apply)
@@ -163,7 +168,7 @@ object Command {
 
   val version = Opts.flag("version", "Display version").as(VersionFlag)
 
-  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(version).orElse(tableCheck))
+  val igluctlCommand = Cmd(generated.ProjectSettings.name, s"Snowplow Iglu command line utils")(static.orElse(lint).orElse(server).orElse(version).orElse(tableCheck).orElse(verify))
 
 
   sealed trait IgluctlCommand extends Product with Serializable
@@ -190,9 +195,11 @@ object Command {
                         region: Option[String],
                         skipSchemaLists: Boolean) extends StaticCommand
 
-  case class VerifyParquet(input: Path) extends StaticCommand
+  sealed trait VerifyCommand extends IgluctlCommand
 
-  case class VerifyRedshift(igluServerUrl: Server.HttpUrl, apiKey: Option[UUID]) extends StaticCommand
+  case class VerifyParquet(input: Path) extends VerifyCommand
+
+  case class VerifyRedshift(igluServerUrl: Server.HttpUrl, apiKey: Option[UUID]) extends VerifyCommand
 
   case class Lint(input: Path,
                   skipChecks: List[Linter],
