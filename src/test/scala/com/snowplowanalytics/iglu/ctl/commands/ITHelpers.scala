@@ -17,7 +17,7 @@ object ITHelpers {
   implicit val ioContextShift: ContextShift[IO] = IO.contextShift(executionContext)
   implicit val ioTimer: Timer[IO] = IO.timer(executionContext)
 
-  def testSchema(fields: String): String =
+  def testSchema(fields: String, version: String): String =
     s"""
        |{
        |  "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
@@ -26,23 +26,7 @@ object ITHelpers {
        |    "vendor": "com.test",
        |    "name": "test",
        |    "format": "jsonschema",
-       |    "version": "1-0-0"
-       |  },
-       |  "type": "object",
-       |  "properties": $fields
-       |}
-       |""".stripMargin
-
-  def testSchemaWrongType(fields: String, minor: Int): String =
-    s"""
-       |{
-       |  "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       |  "description": "Test schema",
-       |  "self": {
-       |    "vendor": "com.test",
-       |    "name": "test",
-       |    "format": "jsonschema",
-       |    "version": "1-0-$minor"
+       |    "version": "$version"
        |  },
        |  "type": "object",
        |  "properties": $fields

@@ -52,7 +52,7 @@ class TableCheckITSpec extends Specification {
               |		"product_4096": {"type": ["string", "number"]},
               |		"product_bool_int": {"type": ["boolean", "integer"]}
               |	}
-              |""".stripMargin))
+              |""".stripMargin, "1-0-0"))
         )
         result must beRight(List(
           """Matched:
@@ -64,7 +64,7 @@ class TableCheckITSpec extends Specification {
       "duplicated tables but in different schemas are defined in a database" in {
         process(
           databaseDefinition = "database/duplicated_tables.sql",
-          igluSchemas = List(testSchema(fields = """{ "char": {"type": "string"} }"""))
+          igluSchemas = List(testSchema(fields = """{ "char": {"type": "string"} }""", "1-0-0"))
         ) must beRight(List(
           """Matched:
             |Table for iglu:com.test/test/jsonschema/1-0-0 is matched
@@ -93,7 +93,7 @@ class TableCheckITSpec extends Specification {
               |		"char": {"type": "string", "minLength": 10, "maxLength": 10},
               |		"varchar": {"type": "string", "maxLength": 10}
               |	}
-              |""".stripMargin))
+              |""".stripMargin, "1-0-0"))
         )
         result must beRight(List(
           """Unmatched:
@@ -112,7 +112,7 @@ class TableCheckITSpec extends Specification {
               |   "wrong_type": { "type": "integer" },
               |   "wrong_nullability": { "type": "string" },
               |   "only_in_schema": { "type": "string" }
-              |}""".stripMargin))
+              |}""".stripMargin, "1-0-0"))
         )
         result must beRight(List(
           """Unmatched:
@@ -140,16 +140,16 @@ class TableCheckITSpec extends Specification {
         val result = process(
           databaseDefinition = "database/broken-storage-2.sql",
           igluSchemas = List(
-            testSchemaWrongType(fields =
+            testSchema(fields =
               """
                 |{
                 |   "wrong_type": { "type": "integer", "maximum": 65111 }
-                |}""".stripMargin, 0),
-            testSchemaWrongType(fields =
+                |}""".stripMargin, "1-0-0"),
+            testSchema(fields =
             """
               |{
               |   "wrong_type": { "type": "integer" }
-              |}""".stripMargin, 1))
+              |}""".stripMargin, "1-0-1"))
         )
         result must beRight(List(
           """Unmatched:

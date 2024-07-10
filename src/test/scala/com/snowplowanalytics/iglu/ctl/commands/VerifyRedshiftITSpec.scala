@@ -23,11 +23,11 @@ class VerifyRedshiftITSpec extends Specification {
           testSchema(fields =
           """
               |{"cacheSize": {"type": "integer", "minimum": 0}}
-              |""".stripMargin),
-          testSchemaWrongType(fields =
+              |""".stripMargin, "1-0-0"),
+          testSchema(fields =
             """
               |{"cacheSize": {"type": "number"}}
-              |""".stripMargin, 1)
+              |""".stripMargin, "1-0-1")
         ),
         verbose = false
       )
@@ -39,11 +39,11 @@ class VerifyRedshiftITSpec extends Specification {
           testSchema(fields =
             """
               |{"cacheSize": {"type": "integer", "minimum": 0}}
-              |""".stripMargin),
-          testSchemaWrongType(fields =
+              |""".stripMargin, "1-0-0"),
+          testSchema(fields =
             """
               |{"cacheSize": {"type": "number"}}
-              |""".stripMargin, 1)
+              |""".stripMargin, "1-0-1")
         ),
         verbose = true
       )
@@ -58,11 +58,11 @@ class VerifyRedshiftITSpec extends Specification {
           testSchema(fields =
             """
               |{"cacheSize": {"type": "number"}}
-              |""".stripMargin),
-          testSchemaWrongType(fields =
+              |""".stripMargin, "1-0-0"),
+          testSchema(fields =
             """
               |{"cacheSize": {"type": "integer"}}
-              |""".stripMargin, 1)
+              |""".stripMargin, "1-0-1")
         ),
         verbose = false
       )
