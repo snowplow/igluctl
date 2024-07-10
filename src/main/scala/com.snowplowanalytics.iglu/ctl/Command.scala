@@ -116,6 +116,7 @@ object Command {
   val selfDescribingSchema = Opts.option[SchemaKey]("schema", "Schema to check against. It should have iglu:<URI> format")
   val igluServerUrl = Opts.option[Server.HttpUrl]("server", "Iglu Server URL")
   val igluServerApiKey = Opts.option[UUID]("apikey", "Iglu Server Read ApiKey (non master)").orNone
+  val verbose = Opts.flag("verbose", "Whether verify-redshift should print detailed report or not", "v").orFalse
   val dbSchema = Opts.option[String]("dbschema", "Database schema").withDefault("atomic")
 
   val singleTableCheck = (igluResolver, selfDescribingSchema).mapN(SingleTableCheck.apply)
@@ -146,7 +147,7 @@ object Command {
     input.map(VerifyParquet.apply)
   }
   val verifyRedshift = Opts.subcommand("redshift", "Detect breaking changes between JSON schemas for Redshift") {
-    (igluServerUrl, igluServerApiKey).mapN(VerifyRedshift.apply)
+    (igluServerUrl, igluServerApiKey, verbose).mapN(VerifyRedshift.apply)
   }
 
   val verify = Opts.subcommand("verify", "Detect breaking changes between JSON schemas for different targets") {
@@ -199,7 +200,7 @@ object Command {
 
   case class VerifyParquet(input: Path) extends VerifyCommand
 
-  case class VerifyRedshift(igluServerUrl: Server.HttpUrl, apiKey: Option[UUID]) extends VerifyCommand
+  case class VerifyRedshift(igluServerUrl: Server.HttpUrl, apiKey: Option[UUID], verbose: Boolean) extends VerifyCommand
 
   case class Lint(input: Path,
                   skipChecks: List[Linter],

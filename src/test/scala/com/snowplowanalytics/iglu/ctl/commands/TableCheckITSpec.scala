@@ -16,6 +16,7 @@ import cats.effect.{ContextShift, IO, Resource, Timer}
 import com.dimafeng.testcontainers.{JdbcDatabaseContainer, MockServerContainer, PostgreSQLContainer}
 import com.snowplowanalytics.iglu.ctl.commands.TableCheckITSpec._
 import com.snowplowanalytics.iglu.ctl.{Command, Server}
+import com.snowplowanalytics.iglu.ctl.commands.ITHelpers._
 import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
@@ -51,7 +52,7 @@ class TableCheckITSpec extends Specification {
               |		"product_4096": {"type": ["string", "number"]},
               |		"product_bool_int": {"type": ["boolean", "integer"]}
               |	}
-              |""".stripMargin))
+              |""".stripMargin, "1-0-0"))
         )
         result must beRight(List(
           """Matched:
@@ -63,7 +64,7 @@ class TableCheckITSpec extends Specification {
       "duplicated tables but in different schemas are defined in a database" in {
         process(
           databaseDefinition = "database/duplicated_tables.sql",
-          igluSchemas = List(testSchema(fields = """{ "char": {"type": "string"} }"""))
+          igluSchemas = List(testSchema(fields = """{ "char": {"type": "string"} }""", "1-0-0"))
         ) must beRight(List(
           """Matched:
             |Table for iglu:com.test/test/jsonschema/1-0-0 is matched
@@ -92,7 +93,7 @@ class TableCheckITSpec extends Specification {
               |		"char": {"type": "string", "minLength": 10, "maxLength": 10},
               |		"varchar": {"type": "string", "maxLength": 10}
               |	}
-              |""".stripMargin))
+              |""".stripMargin, "1-0-0"))
         )
         result must beRight(List(
           """Unmatched:
@@ -111,7 +112,7 @@ class TableCheckITSpec extends Specification {
               |   "wrong_type": { "type": "integer" },
               |   "wrong_nullability": { "type": "string" },
               |   "only_in_schema": { "type": "string" }
-              |}""".stripMargin))
+              |}""".stripMargin, "1-0-0"))
         )
         result must beRight(List(
           """Unmatched:
@@ -139,16 +140,16 @@ class TableCheckITSpec extends Specification {
         val result = process(
           databaseDefinition = "database/broken-storage-2.sql",
           igluSchemas = List(
-            testSchemaWrongType(fields =
+            testSchema(fields =
               """
                 |{
                 |   "wrong_type": { "type": "integer", "maximum": 65111 }
-                |}""".stripMargin, 0),
-            testSchemaWrongType(fields =
+                |}""".stripMargin, "1-0-0"),
+            testSchema(fields =
             """
               |{
               |   "wrong_type": { "type": "integer" }
-              |}""".stripMargin, 1))
+              |}""".stripMargin, "1-0-1"))
         )
         result must beRight(List(
           """Unmatched:
@@ -165,7 +166,7 @@ class TableCheckITSpec extends Specification {
                       igluSchemas: List[String]) = {
     prepareResources(databaseDefinition)
       .use { resources =>
-        val command = prapareCommand(resources.database, resources.igluServer)
+        val command = prepareCommand(resources.database, resources.igluServer)
         mockIgluSchemas(resources.igluServer, igluSchemas)
         TableCheck.process(command, resources.httpClient).value
       }.unsafeRunSync()
@@ -180,7 +181,7 @@ class TableCheckITSpec extends Specification {
   }
 
 
-  private def prapareCommand(database: PostgreSQLContainer,
+  private def prepareCommand(database: PostgreSQLContainer,
                              igluServer: MockServerContainer) = {
     Command.TableCheck(Command.MultipleTableCheck(
       Server.HttpUrl(Uri.unsafeFromString(igluServer.endpoint)), None),
@@ -195,73 +196,15 @@ class TableCheckITSpec extends Specification {
     )
   }
 
-  private def mkContainer[A <: Startable](container: A): Resource[IO, A] =
-    Resource.make {
-      IO {
-        container.start()
-        container
-      }
-    }(container => IO(container.stop()))
-
-
-  private def mockIgluSchemas(server: MockServerContainer,
-                              igluSchemas: List[String]) = {
-    val mockClient = new MockServerClient(server.host, server.serverPort)
-    mockClient
-      .when(request().withPath("/api/schemas"))
-      .respond(response().withStatusCode(200).withBody(igluSchemas.mkString("[", ",", "]")))
-
-  }
-
   private def createDatabase(initScript: String): PostgreSQLContainer = {
     val params = JdbcDatabaseContainer.CommonParams(initScriptPath = Option(initScript))
     PostgreSQLContainer.Def(
       commonJdbcParams = params
     ).createContainer()
   }
-
-  private def testSchema(fields: String): String =
-    s"""
-       |{
-       |  "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       |  "description": "Test schema",
-       |  "self": {
-       |    "vendor": "com.test",
-       |    "name": "test",
-       |    "format": "jsonschema",
-       |    "version": "1-0-0"
-       |  },
-       |  "type": "object",
-       |  "properties": $fields
-       |}    
-       |""".stripMargin
-
-  private def testSchemaWrongType(fields: String, minor: Int): String =
-    s"""
-       |{
-       |  "$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
-       |  "description": "Test schema",
-       |  "self": {
-       |    "vendor": "com.test",
-       |    "name": "test",
-       |    "format": "jsonschema",
-       |    "version": "1-0-$minor"
-       |  },
-       |  "type": "object",
-       |  "properties": $fields
-       |}    
-       |""".stripMargin
-
-
 }
 
 object TableCheckITSpec {
-
-  private val executionContext: ExecutionContext = ExecutionContext.global
-  implicit val ioContextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  implicit val ioTimer: Timer[IO] = IO.timer(executionContext)
-
-
   final case class TestResources(database: PostgreSQLContainer,
                                  igluServer: MockServerContainer,
                                  httpClient: Client[IO])

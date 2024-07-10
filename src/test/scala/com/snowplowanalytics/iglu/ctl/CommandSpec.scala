@@ -44,6 +44,8 @@ class CommandSpec extends Specification { def is = s2"""
     extracts verify parquet command $e9
     extracts verify redshift command without apikey $e10
     extracts verify redshift command with apikey $e11
+    extracts verify redshift command with long verbose flag $e12
+    extracts verify redshift command with short verbose flag $e13
   """
 
   def e1 = {
@@ -115,13 +117,27 @@ class CommandSpec extends Specification { def is = s2"""
     val verify = Command.parse("verify redshift --server http://localhost:8080".split(" ").toList)
     val url = Server.HttpUrl.parse("http://localhost:8080").getOrElse(throw new RuntimeException("Invalid URI"))
 
-    verify must beRight(Command.VerifyRedshift(url, None))
+    verify must beRight(Command.VerifyRedshift(url, None, verbose = false))
   }
 
   def e11 = {
     val verify = Command.parse("verify redshift --server http://localhost:8080 --apikey e82d494f-ba11-4206-b78a-d2aaedeeab44".split(" ").toList)
     val url = Server.HttpUrl.parse("http://localhost:8080").getOrElse(throw new RuntimeException("Invalid URI"))
 
-    verify must beRight(Command.VerifyRedshift(url, UUID.fromString("e82d494f-ba11-4206-b78a-d2aaedeeab44").some))
+    verify must beRight(Command.VerifyRedshift(url, UUID.fromString("e82d494f-ba11-4206-b78a-d2aaedeeab44").some, verbose = false))
+  }
+
+  def e12 = {
+    val verify = Command.parse("verify redshift --server http://localhost:8080 --apikey e82d494f-ba11-4206-b78a-d2aaedeeab44 --verbose".split(" ").toList)
+    val url = Server.HttpUrl.parse("http://localhost:8080").getOrElse(throw new RuntimeException("Invalid URI"))
+
+    verify must beRight(Command.VerifyRedshift(url, UUID.fromString("e82d494f-ba11-4206-b78a-d2aaedeeab44").some, verbose = true))
+  }
+
+  def e13 = {
+    val verify = Command.parse("verify redshift --server http://localhost:8080 --apikey e82d494f-ba11-4206-b78a-d2aaedeeab44 -v".split(" ").toList)
+    val url = Server.HttpUrl.parse("http://localhost:8080").getOrElse(throw new RuntimeException("Invalid URI"))
+
+    verify must beRight(Command.VerifyRedshift(url, UUID.fromString("e82d494f-ba11-4206-b78a-d2aaedeeab44").some, verbose = true))
   }
 }
