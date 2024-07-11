@@ -1,3 +1,9 @@
+Version 0.13.0 (2024-07-11)
+---------------------------
+Update dependencies
+Add verbose flag to verify redshift
+Organize verify commands
+
 Version 0.12.2 (2024-02-16)
 ---------------------------
 Bump schema-ddl to 0.22.1 (#176)
