@@ -30,6 +30,8 @@ object Common {
 
   implicit val schemaFullCatsOrder: Order[SchemaVer.Full] = Order.fromOrdering(orderingFull)
 
+  implicit val schemaKeyCatsOrder: Order[SchemaKey] = Order.fromOrdering(SchemaKey.ordering)
+
   val liftIO: FunctionK[IO, Failing] = new FunctionK[IO, Failing] {
     def apply[A](fa: IO[A]): Failing[A] = EitherT.liftF(fa)
   }

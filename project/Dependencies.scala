@@ -16,24 +16,24 @@ object Dependencies {
 
   object V {
     // Java
-    val awsJava          = "2.25.70"
-    val jackson          = "2.12.7"
+    val awsJava          = "2.54.13"
+    val jackson          = "2.22.2"
     // Scala
-    val circe            = "0.14.3"
-    val circeConfig      = "0.10.0"
-    val catsEffect       = "2.5.3"
-    val schemaddl        = "0.22.1"
-    val igluClient       = "1.5.0"
-    val decline          = "1.4.0"
-    val http4s           = "0.22.15"
-    val fs2              = "2.5.9"
-    val doobie           = "0.13.4"
-    val logback          = "1.2.13"
+    val circe            = "0.14.16"
+    val circeConfig      = "0.10.2"
+    val catsEffect       = "3.7.1"
+    val schemaddl        = "0.28.0"
+    val igluClient       = "4.2.1"
+    val decline          = "2.6.2"
+    val http4s           = "0.23.36"
+    val fs2              = "3.14.0"
+    val doobie           = "1.0.0-RC12"
+    val logback          = "1.6.3"
     // Scala (test only)
-    val specs2           = "4.12.3"
-    val scalaCheck       = "1.15.4"
-    val postgresDriver   = "42.5.5"
-    val testcontainers   = "0.40.15"
+    val specs2           = "4.23.0"
+    val scalaCheck       = "1.20.0"
+    val postgresDriver   = "42.7.13"
+    val testcontainers   = "0.44.1"
     val mockServer       = "5.13.2"
   }
 

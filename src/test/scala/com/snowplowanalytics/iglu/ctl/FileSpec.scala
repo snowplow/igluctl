@@ -28,6 +28,7 @@ import com.snowplowanalytics.iglu.ctl.Common.Error
 
 // specs2
 import org.specs2.Specification
+import cats.effect.unsafe.implicits.global
 
 class FileSpec extends Specification { def is = s2"""
   Check File utils
@@ -40,6 +41,8 @@ class FileSpec extends Specification { def is = s2"""
     extractResultFromJsonSchemas returns both 'gap' error and given schemas  $e7
     extractResultFromJsonSchemas returns both given errors and schemas $e8
     extractResultFromJsonSchemas returns only given schemas when there is no error in given list $e9
+    extractResultFromJsonSchemas sorts schemas by vendor, name, format and version $e10
+    readSchemas returns schemas in schema version order, not string order $e11
   """
 
   def e1 = {
@@ -300,4 +303,67 @@ class FileSpec extends Specification { def is = s2"""
     File.extractResultFromJsonSchemas(jsonSchemas, mainFolderPath) must beEqualTo(expected)
   }
 
+  def e10 = {
+    def schemaFile(vendor: String, name: String, version: SchemaVer.Full) = {
+      val ver = version.asString
+      val schemaJson = json"""
+         {
+         	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+         	"self": {
+         		"vendor": $vendor,
+         		"name": $name,
+         		"format": "jsonschema",
+         		"version": $ver
+         	},
+         	"properties": { "name": {} }
+         }"""
+      File.jsonFile(Paths.get(s"/path/$vendor/$name/jsonschema/$ver"), schemaJson).asSchema
+    }
+
+    val unordered = List(
+      schemaFile("com.acme", "event", SchemaVer.Full(1, 0, 10)),
+      schemaFile("com.acme", "event", SchemaVer.Full(2, 0, 0)),
+      schemaFile("com.acme", "event", SchemaVer.Full(1, 0, 2)),
+      schemaFile("com.acme", "click", SchemaVer.Full(1, 0, 0)),
+      schemaFile("com.acme", "event", SchemaVer.Full(1, 0, 0)),
+      schemaFile("com.acme", "event", SchemaVer.Full(1, 1, 0)),
+      schemaFile("com.acme", "event", SchemaVer.Full(1, 0, 1))
+    )
+
+    val expected = List(
+      SchemaMap("com.acme", "click", "jsonschema", SchemaVer.Full(1, 0, 0)),
+      SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(1, 0, 0)),
+      SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(1, 0, 1)),
+      SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(1, 0, 2)),
+      SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(1, 0, 10)),
+      SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(1, 1, 0)),
+      SchemaMap("com.acme", "event", "jsonschema", SchemaVer.Full(2, 0, 0))
+    )
+
+    val result = File
+      .extractResultFromJsonSchemas(unordered, Paths.get("/path"))
+      .right
+      .toList
+      .flatMap(_.toList)
+      .map(_.content.self)
+
+    result must beEqualTo(expected)
+  }
+
+  def e11 = {
+    val input = Paths.get("src/test/resources/unordered-schemas/com.acme/event/jsonschema")
+
+    val expected = (0 to 11).toList.map(a => SchemaVer.Full(1, 0, a)) ++
+      List(SchemaVer.Full(1, 1, 0), SchemaVer.Full(2, 0, 0))
+
+    val result = File
+      .readSchemas(input)
+      .unsafeRunSync()
+      .right
+      .toList
+      .flatMap(_.toList)
+      .map(_.content.self.schemaKey.version)
+
+    result must beEqualTo(expected)
+  }
 }

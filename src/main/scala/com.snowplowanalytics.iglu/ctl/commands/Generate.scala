@@ -25,13 +25,10 @@ import com.snowplowanalytics.iglu.schemaddl.redshift._
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits._
 import com.snowplowanalytics.iglu.ctl.Common.Error
+import com.snowplowanalytics.iglu.ctl.Common.schemaKeyCatsOrder
 import com.snowplowanalytics.iglu.schemaddl.StringUtils.snakeCase
 
-import scala.math.Ordered.orderingToOrdered
-
 object Generate {
-
-  implicit val ord: Ordering[SchemaKey] = SchemaKey.ordering
 
   type IgluSchema = SelfDescribingSchema[Schema]
 
@@ -110,7 +107,9 @@ object Generate {
     * all data to produce: DDL files, migrations, etc
     */
   private[ctl] def transform(dbSchema: String, schemas: NonEmptyList[IgluSchema]): DdlOutput =
-    schemas.groupByNem { s => (
+    // Sorted by SchemaVer, because both the merged Redshift model and the gap detection below
+    // fold over each schema family in sequence
+    schemas.sortBy(_.self.schemaKey).groupByNem { s => (
       s.self.schemaKey.name,
       s.self.schemaKey.vendor,
       s.self.schemaKey.version.model,
@@ -120,7 +119,7 @@ object Generate {
       .map { s =>
         val lookup: MergeRedshiftSchemasResult = foldMapMergeRedshiftSchemas(s)
         val model = lookup.goodModel
-        val sortedKeys = s.map(_.self.schemaKey).toList.sorted
+        val sortedKeys = s.map(_.self.schemaKey).toList
         val (gaps, _) = sortedKeys.foldLeft((List.empty[String], sortedKeys.head)) {
           case ((acc, lastKey), k) => if (
             ((k.version.revision - lastKey.version.revision > 1) & (k.version.addition == lastKey.version.addition)) |

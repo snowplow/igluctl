@@ -89,15 +89,18 @@ object Lint {
     * @return [[Report]] ADT, indicating successful lint or containing errors
     */
   def check(linters: List[Linter])(schema: SelfDescribingSchema[Json]): Either[SchemaFailure, String] = {
-    val syntaxCheck = CirceValidator.checkSchema(schema.schema).map(e => s"Could not validate the schema, path: ${e.path}, message: ${e.message}") match {
+    val syntaxCheck = CirceValidator.checkSchema(schema.schema, Int.MaxValue).map(e => s"Could not validate the schema, path: ${e.path}, message: ${e.message}") match {
       case Nil => Valid[Unit](())
       case e => Invalid(NonEmptyList.fromListUnsafe(e))
     }
 
     val lintCheck = Schema.parse(schema.normalize).map { schema =>
-      lint(schema, linters) match {
-        case report if report.isEmpty => ().validNel[String]
-        case report => NonEmptyList.fromListUnsafe(prettifyReport(report)).invalid[Unit]
+      // prettifyReport deliberately renders nothing for the BigQuery linters, so a non-empty
+      // report can still prettify to an empty list, and then the schema has nothing wrong with
+      // it that we are willing to say
+      NonEmptyList.fromList(prettifyReport(lint(schema, linters))) match {
+        case None => ().validNel[String]
+        case Some(issues) => issues.invalid[Unit]
       }
     } getOrElse NonEmptyList.of("Doesn't contain JSON Schema").invalid[Unit]
 

@@ -40,6 +40,7 @@ import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 import com.snowplowanalytics.iglu.core.circe.implicits._
 
 import com.snowplowanalytics.iglu.ctl.Common.Error
+import com.snowplowanalytics.iglu.ctl.Common.schemaKeyCatsOrder
 import com.snowplowanalytics.iglu.ctl
 
 sealed trait File[A] extends Serializable { self =>
@@ -152,6 +153,11 @@ object File {
     * All schemas loaded into memory in order to check their relationships and possible gaps
     * Any gaps or invalid files are non-critical errors and preserved in `Ior.Both`
     * Empty input directory or absence of valid schemas is critical error (`Ior.Left`)
+    *
+    * Schemas are returned ordered by vendor, name, format and SchemaVer, so consumers that care
+    * about schema evolution (pushing to a registry, generating migrations) see them in the order
+    * they were published. Note this cannot be done while walking the file system, because a sort
+    * of file paths puts `1-0-10` before `1-0-2`
     */
   def readSchemas(input: Path): IO[IorNel[Error, NonEmptyList[SchemaFile]]] =
     for {
@@ -167,7 +173,7 @@ object File {
           case Nil =>
             NonEmptyList.of(Error.ReadError(input, "no valid JSON Schemas")).leftIor
           case h :: t =>
-            val files = NonEmptyList(h, t)
+            val files = NonEmptyList(h, t).sortBy(_.content.self.schemaKey)
             val gapErrors = Common.checkSchemasConsistency(files.map(_.content.self)).leftMap(_.map(error => Error.ConsistencyError(error)))
             Ior.fromEither(gapErrors).putRight(files)
         }
@@ -276,7 +282,7 @@ object File {
     }
     Stream
       .eval(action)
-      .flatMap(iterator => Stream.fromIterator[IO](iterator))
+      .flatMap(iterator => Stream.fromIterator[IO](iterator, 64))
       .flatMap {
         case Right(path) =>
           Stream

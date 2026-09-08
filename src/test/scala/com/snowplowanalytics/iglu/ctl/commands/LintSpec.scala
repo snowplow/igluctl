@@ -20,6 +20,7 @@ import org.specs2.matcher.EventuallyMatchers
 import org.specs2.mutable.Specification
 
 import java.nio.file.{Path, Paths}
+import cats.effect.unsafe.implicits.global
 
 class LintSpec extends Specification with EventuallyMatchers {
 
@@ -56,6 +57,18 @@ class LintSpec extends Specification with EventuallyMatchers {
         )
       )
       val expected = Set("OK: com.acme/signup_click/jsonschema/1-0-0", "OK: com.maxmind/anonymous_ip/jsonschema/1-0-0", "TOTAL: 2 valid schemas", "TOTAL: 0 schemas didn't pass validation")
+      eventually(result.value.unsafeRunSync().map(_.toSet) must beRight(===(expected)))
+    }
+
+    "lint a schema whose only issues come from the BigQuery linters" >> {
+      val result = Lint.process(
+        Command.Lint(
+          input = testResourcePath("bq-linter-schemas"),
+          skipChecks = Nil,
+          skipSchemas = Nil
+        )
+      )
+      val expected = Set("OK: com.acme/http_header/jsonschema/1-0-0", "TOTAL: 1 valid schemas", "TOTAL: 0 schemas didn't pass validation")
       eventually(result.value.unsafeRunSync().map(_.toSet) must beRight(===(expected)))
     }
 

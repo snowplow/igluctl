@@ -18,9 +18,9 @@ lazy val root = project.in(file("."))
   .settings(
     name                  :=  "igluctl",
     organization          :=  "com.snowplowanalytics",
-    version               :=  "0.13.0",
+    version               :=  "0.13.1",
     description           :=  "Iglu Command Line Interface",
-    scalaVersion          :=  "2.13.9"
+    scalaVersion          :=  "2.13.18"
   )
   .settings(buildSettings: _*)
   .settings(

@@ -9,13 +9,8 @@ import org.mockserver.model.HttpRequest.request
 import org.mockserver.model.HttpResponse.response
 import org.testcontainers.lifecycle.Startable
 
-import scala.concurrent.ExecutionContext
 
 object ITHelpers {
-
-  val executionContext: ExecutionContext = ExecutionContext.global
-  implicit val ioContextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  implicit val ioTimer: Timer[IO] = IO.timer(executionContext)
 
   def testSchema(fields: String, version: String): String =
     s"""

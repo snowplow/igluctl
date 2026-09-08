@@ -1,0 +1,13 @@
+{
+	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+	"description": "Test schema with no fields, like an event that carries no payload",
+	"self": {
+		"vendor": "com.test",
+		"name": "fieldless_event",
+		"format": "jsonschema",
+		"version": "1-0-0"
+	},
+	"type": "object",
+	"properties": {},
+	"additionalProperties": false
+}

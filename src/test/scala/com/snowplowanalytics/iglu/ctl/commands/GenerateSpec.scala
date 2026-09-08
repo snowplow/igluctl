@@ -16,6 +16,7 @@ package commands
 import java.nio.file.Paths
 
 import cats.data._
+import io.circe.Json
 import io.circe.literal._
 import com.snowplowanalytics.iglu.core.{SchemaMap, SchemaVer}
 import com.snowplowanalytics.iglu.ctl.File.textFile
@@ -36,6 +37,7 @@ class GenerateSpec extends Specification { def is = s2"""
     correctly create ddl for schema with field without type $e13
     correctly create ddl for empty schema $e14
     warn about missing schema in the transformSnowplow $e15
+    produce the same output whatever order the schemas arrive in $e16
   """
 
   def e1 = {
@@ -901,7 +903,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
         |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
         |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
-        |    "enum_field"          VARCHAR(9)    ENCODE TEXT255,
+        |    "enum_field"          VARCHAR(9)    ENCODE ZSTD,
         |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
         |)
@@ -963,7 +965,7 @@ class GenerateSpec extends Specification { def is = s2"""
         |    "ref_root"            VARCHAR(255)  ENCODE ZSTD      NOT NULL,
         |    "ref_tree"            VARCHAR(1500) ENCODE ZSTD      NOT NULL,
         |    "ref_parent"          VARCHAR(255)  ENCODE ZSTD      NOT NULL,
-        |    "a_field.enum_field"  VARCHAR(9)    ENCODE TEXT255,
+        |    "a_field.enum_field"  VARCHAR(9)    ENCODE ZSTD,
         |    "non_interaction_hit" BOOLEAN       ENCODE RUNLENGTH,
         |    FOREIGN KEY (root_id) REFERENCES atomic.events(event_id)
         |)
@@ -1127,5 +1129,32 @@ class GenerateSpec extends Specification { def is = s2"""
     val output = Generate.transform("atomic", NonEmptyList.of(input1, input2))
 
     output.warnings.head must beEqualTo("Gap in revisions between iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-0 and iglu:com.amazon.aws.lambda/java_context/jsonschema/1-0-2")
+  }
+
+  def e16 = {
+    def schema(version: String, properties: Json) = json"""
+        {
+        	"$$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+        	"self": {
+        		"vendor": "com.acme",
+        		"name": "example",
+        		"format": "jsonschema",
+        		"version": $version
+        	},
+        	"type": "object",
+        	"properties": $properties,
+        	"additionalProperties": false
+        }""".schema
+
+    val initial = schema("1-0-0", json"""{ "foo": { "type": "string" } }""")
+    val second  = schema("1-0-1", json"""{ "foo": { "type": "string" }, "bar": { "type": "integer" } }""")
+    val third   = schema("1-0-2", json"""{ "foo": { "type": "string" }, "bar": { "type": "integer" }, "baz": { "type": "boolean" } }""")
+
+    // The order 1-0-0, 1-0-2, 1-0-1 is what a string sort of file paths would produce for a family
+    // with ten or more additions, so transform must not depend on the order it receives
+    val sorted = Generate.transform("atomic", NonEmptyList.of(initial, second, third))
+    val shuffled = Generate.transform("atomic", NonEmptyList.of(initial, third, second))
+
+    (shuffled must beEqualTo(sorted)) and (sorted.warnings must beEmpty)
   }
 }

@@ -15,8 +15,19 @@ package commands
 
 // java
 import java.nio.file.Paths
+import java.util.UUID
 
 import com.snowplowanalytics.iglu.core.SchemaVer
+
+// cats
+import cats.effect.IO
+import cats.effect.Ref
+import cats.implicits._
+
+// http4s
+import org.http4s.{HttpApp, Response, Status}
+import org.http4s.client.Client
+import org.http4s.implicits._
 
 // circe
 import io.circe.literal._
@@ -28,11 +39,13 @@ import org.specs2.Specification
 import com.snowplowanalytics.iglu.core.SchemaMap
 import com.snowplowanalytics.iglu.ctl.File.jsonFile
 import com.snowplowanalytics.iglu.ctl.Common.Error
+import cats.effect.unsafe.implicits.global
 
 
 class PushSpec extends Specification { def is = s2"""
   Registry sync command (sync) specification
     check paths on FS and SchemaKey.toPath correspondence $e1
+    push schemas to the registry in schema version order $e2
   """
 
   def e1 = {
@@ -93,5 +106,29 @@ class PushSpec extends Specification { def is = s2"""
     val invalidShortPathExpectation = jsonFile4.asSchema must beLeft(Error.PathMismatch(Paths.get("/event/jsonschema/1-0-2"),SchemaMap("com.acme","event","jsonschema",SchemaVer.Full(1,0,2))))
 
     validSchemaExpectation and mismatchedSchemaVerExpectation and invalidSchemaExpectation and invalidShortPathExpectation
+  }
+
+  def e2 = {
+    val command = Command.StaticPush(
+      input = Paths.get("src/test/resources/unordered-schemas"),
+      registryRoot = Server.HttpUrl(uri"http://iglu-server.com"),
+      apikey = UUID.fromString("dfa2a4e4-b3f0-4ee5-a4ad-c15b7c0a1b3e"),
+      public = false
+    )
+
+    val expected = (0 to 11).toList.map(a => s"1-0-$a") ++ List("1-1-0", "2-0-0")
+
+    val pushed = (for {
+      recorded <- Ref.of[IO, List[String]](Nil)
+      client    = Client.fromHttpApp(HttpApp[IO] { request =>
+        recorded
+          .update(_ :+ request.uri.path.renderString.split("/").last)
+          .as(Response[IO](Status.Created).withEntity("""{"message":"Schema created","location":"iglu:x"}"""))
+      })
+      _        <- Push.process(command, client).value
+      paths    <- recorded.get
+    } yield paths).unsafeRunSync()
+
+    pushed must beEqualTo(expected)
   }
 }

@@ -20,6 +20,7 @@ import cats.syntax.traverse._
 import cats.{Order, Show}
 import com.snowplowanalytics.iglu.client.ClientError
 import com.snowplowanalytics.iglu.client.resolver.Resolver
+import com.snowplowanalytics.iglu.client.resolver.registries.JavaNetRegistryLookup._
 import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.Storage.Column
@@ -41,19 +42,15 @@ import java.util.UUID
 
 object TableCheck {
 
-  def process(command: Command.TableCheck, httpClient: Client[IO])
-             (implicit cs: ContextShift[IO], t: Timer[IO]): FinalResult =
-    withBlocker { blocker =>
-      createStorage(command, blocker)
-        .flatMap(storage => handleCommand(command, httpClient, storage))
-        .leftMap(e => NonEmptyList.of(e))
-        .map(l => List(aggregateResults(l).show))
-    }
+  def process(command: Command.TableCheck, httpClient: Client[IO]): FinalResult =
+    createStorage(command)
+      .flatMap(storage => handleCommand(command, httpClient, storage))
+      .leftMap(e => NonEmptyList.of(e))
+      .map(l => List(aggregateResults(l).show))
 
   private def handleCommand(command: Command.TableCheck,
                             httpClient: Client[IO],
-                            storage: Storage[IO])
-                           (implicit t: Timer[IO]): Failing[List[Result]] = {
+                            storage: Storage[IO]): Failing[List[Result]] = {
     command.tableCheckType match {
       case Command.SingleTableCheck(resolver, schema) =>
         tableCheckSingle(resolver, schema, storage, command.dbSchema)
@@ -65,7 +62,7 @@ object TableCheck {
   private def tableCheckSingle(resolver: Path,
                                schemaKey: SchemaKey,
                                storage: Storage[IO],
-                               dbschema: String)(implicit t: Timer[IO]): Failing[List[Result]] =
+                               dbschema: String): Failing[List[Result]] =
     for {
       schemas <- fetchSchemaFamily(resolver, schemaKey)
       result <- checkTable(storage, schemas, dbschema)
@@ -188,8 +185,7 @@ object TableCheck {
   }
 
   private def fetchSchemaFamily(resolverPath: Path,
-                                schemaKey: SchemaKey)
-                               (implicit t: Timer[IO]): Failing[NonEmptyList[IgluSchema]] =
+                                schemaKey: SchemaKey): Failing[NonEmptyList[IgluSchema]] =
     for {
       resolver <- createResolver(resolverPath)
       jsons <- resolver.fetchSchemas(schemaKey.vendor, schemaKey.name, schemaKey.version.model)
@@ -244,17 +240,9 @@ object TableCheck {
         .leftMap(e => Error.ConfigParseError(s"Resolver can not created: $e"): Error)
     } yield resolver
 
-  private def createStorage(command: Command.TableCheck, blocker: Blocker)
-                           (implicit cs: ContextShift[IO]): Failing[Storage[IO]] = {
+  private def createStorage(command: Command.TableCheck): Failing[Storage[IO]] = {
     Storage.resolveDbConfig(command.storageConfig)
-      .map(config => Storage.initialize[IO](config, blocker))
-  }
-
-  private def withBlocker(process: Blocker => FinalResult)
-                         (implicit cs: ContextShift[IO]): FinalResult = EitherT {
-    Blocker[IO].use { blocker =>
-      process(blocker).value
-    }
+      .map(config => Storage.initialize[IO](config))
   }
 
 

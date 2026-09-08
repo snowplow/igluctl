@@ -20,6 +20,7 @@ import io.circe.Json
 import org.http4s.{Header, Response, Status}
 import org.specs2.Specification
 import org.typelevel.ci.CIStringSyntax
+import cats.effect.unsafe.implicits.global
 
 class PullSpec extends Specification { def is = s2"""
   parseResponse function in Pull command

@@ -1,11 +1,12 @@
 package com.snowplowanalytics.iglu.ctl.commands
 
-import cats.{Order, Show}
+import cats.Show
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.IO
 import cats.implicits._
-import com.snowplowanalytics.iglu.core.{SchemaKey, SelfDescribingSchema}
+import com.snowplowanalytics.iglu.core.SelfDescribingSchema
 import com.snowplowanalytics.iglu.ctl._
+import com.snowplowanalytics.iglu.ctl.Common.schemaKeyCatsOrder
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.Schema
 import com.snowplowanalytics.iglu.schemaddl.jsonschema.circe.implicits.toSchema
 import com.snowplowanalytics.iglu.schemaddl.parquet.{Field, Migrations}
@@ -21,10 +22,12 @@ object VerifyParquet {
   private final case class BreakingChange(source: Field, changes: List[Migrations.Breaking])
 
   def process(command: Command.VerifyParquet): Result = {
-    readSchemas(command.input)
-      .map(handleInputSchemas)
-      .map(prepareOutputMessage)
+    readSchemas(command.input).map(verify)
   }
+
+  /** Pure core of the command: report the breaking changes within each schema family */
+  private[ctl] def verify(schemas: NonEmptyList[SelfDescribingSchema[Schema]]): List[String] =
+    prepareOutputMessage(handleInputSchemas(schemas))
 
   private def readSchemas(input: Path): FailingNel[NonEmptyList[SelfDescribingSchema[Schema]]] = {
     EitherT(File.readSchemas(input).map(Common.leftBiasedIor))
@@ -34,9 +37,9 @@ object VerifyParquet {
       }
   }
 
-  private def handleInputSchemas(schemas: NonEmptyList[SelfDescribingSchema[Schema]]) = {
+  private def handleInputSchemas(schemas: NonEmptyList[SelfDescribingSchema[Schema]]): List[BreakingChange] = {
     groupSchemasToFamilies(schemas)
-      .map(buildDdlFields)
+      .mapFilter(buildDdlFields)
       .flatMap(detectBreakingChanges)
   }
 
@@ -50,11 +53,19 @@ object VerifyParquet {
       .map(_.sortBy(_.self.schemaKey))
   }
 
-  private def buildDdlFields(schemaFamily: SchemaFamily): NonEmptyList[Field] = {
-    schemaFamily
-      .map { schema =>
-        Field.build(schema.self.schemaKey.toPath, schema.schema, enforceValuePresence = false)
-      }
+  /**
+    * A schema with no fields and `additionalProperties: false`, e.g. an event that carries no
+    * payload, has no Parquet representation, so it cannot take part in a comparison and is
+    * skipped. A family whose schemas are all skipped this way is skipped entirely.
+    */
+  private def buildDdlFields(schemaFamily: SchemaFamily): Option[NonEmptyList[Field]] = {
+    NonEmptyList.fromList {
+      schemaFamily
+        .toList
+        .mapFilter { schema =>
+          Field.build(schema.self.schemaKey.toPath, schema.schema, enforceValuePresence = false)
+        }
+    }
   }
 
   private def detectBreakingChanges(fields: NonEmptyList[Field]): List[BreakingChange] = {
@@ -90,6 +101,5 @@ object VerifyParquet {
   private implicit val breakingChangeShow: Show[BreakingChange] = Show.show { change =>
     s"Breaking change introduced by '${change.source.name}'. Changes: ${change.changes.map(_.toString).mkString("\n")}"
   }
-  private implicit val schemaKeyOrdering: Order[SchemaKey] = Order.fromOrdering(SchemaKey.ordering)
 
 }

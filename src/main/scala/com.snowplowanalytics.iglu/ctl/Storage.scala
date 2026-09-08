@@ -25,7 +25,7 @@ import doobie.util.transactor.Transactor
 
 case class Storage[F[_]](xa: Transactor[F]) {
 
-  def getColumns(tableName: String, tableSchema: String)(implicit F: Bracket[F, Throwable]): F[List[Storage.Column]] = {
+  def getColumns(tableName: String, tableSchema: String)(implicit F: MonadCancelThrow[F]): F[List[Storage.Column]] = {
     columnsQuery(tableName, tableSchema)
       .query[Storage.Column]
       .to[List]
@@ -33,7 +33,7 @@ case class Storage[F[_]](xa: Transactor[F]) {
       .map(removeCommonColumns)
   }
 
-  def getComment(tableName: String, tableSchema: String)(implicit F: Bracket[F, Throwable]): F[Option[Storage.Comment]] =
+  def getComment(tableName: String, tableSchema: String)(implicit F: MonadCancelThrow[F]): F[Option[Storage.Comment]] =
     fr"""
       SELECT obj_description(pg_class.oid) AS comment
       FROM pg_class
@@ -112,11 +112,10 @@ object Storage {
                       username: String,
                       password: String)
 
-  def initialize[F[_]: Effect: ContextShift](storageConfig: DbConfig,
-                                             blocker: Blocker): Storage[F] = storageConfig match {
+  def initialize[F[_]: Async](storageConfig: DbConfig): Storage[F] = storageConfig match {
     case DbConfig(host, port, dbname, username, password) =>
       val url = s"jdbc:postgresql://$host:$port/$dbname?loggerLevel=OFF"
-      val xa = Transactor.fromDriverManager[F]("org.postgresql.Driver", url, username, password, blocker)
+      val xa = Transactor.fromDriverManager[F]("org.postgresql.Driver", url, username, password, None)
       Storage(xa)
   }
 

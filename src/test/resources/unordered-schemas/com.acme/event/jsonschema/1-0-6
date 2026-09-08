@@ -1,0 +1,15 @@
+{
+	"$schema": "http://iglucentral.com/schemas/com.snowplowanalytics.self-desc/schema/jsonschema/1-0-0#",
+	"description": "Fixture schema for verifying push ordering",
+	"self": {
+		"vendor": "com.acme",
+		"name": "event",
+		"format": "jsonschema",
+		"version": "1-0-6"
+	},
+	"type": "object",
+	"properties": {
+		"name": { "type": "string" }
+	},
+	"additionalProperties": false
+}

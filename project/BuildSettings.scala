@@ -31,7 +31,8 @@ object BuildSettings {
       "-unchecked",
       "-Xfatal-warnings",
       "-Xlint",
-      "-language:higherKinds"),
+      "-language:higherKinds",
+      "-release:11"),
     Compile / console / scalacOptions := Seq(
       "-deprecation",
       "-encoding", "UTF-8"
@@ -45,7 +46,7 @@ object BuildSettings {
     ),
     Test / scalacOptions := Seq("-Yrangepos"),
 
-    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full)
+    addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.13.4" cross CrossVersion.full)
   )
 
   lazy val scalifySettings = Seq(
@@ -65,7 +66,7 @@ object BuildSettings {
   lazy val sbtAssemblySettings: Seq[Setting[_]] = Seq(
 
     // Executable jarfile
-    assembly / assemblyOption ~= { _.copy(prependShellScript = Some(defaultShellScript)) },
+    assembly / assemblyPrependShellScript := Some(defaultShellScript),
 
     // Name it as an executable
     assembly / assemblyJarName := { name.value },

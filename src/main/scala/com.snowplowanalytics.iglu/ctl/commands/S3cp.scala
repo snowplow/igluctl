@@ -57,7 +57,7 @@ object S3cp {
       case (None, None, Some(p)) =>
         EitherT.liftF[IO, Error, AwsCredentialsProvider](IO(ProfileCredentialsProvider.create(p)))
       case (None, None, None) =>
-        EitherT.liftF[IO, Error, AwsCredentialsProvider](IO(DefaultCredentialsProvider.create))
+        EitherT.liftF[IO, Error, AwsCredentialsProvider](IO(DefaultCredentialsProvider.builder().build()))
       case _ =>
         EitherT.leftT[IO, AwsCredentialsProvider](Error.ConfigParseError("Invalid AWS authentication method. Following methods are supported: static credentials, profile, default credentials chain"))
     }

@@ -12,7 +12,7 @@
  */
 package com.snowplowanalytics.iglu.ctl.commands
 
-import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.effect.{IO, Resource}
 import com.dimafeng.testcontainers.{JdbcDatabaseContainer, MockServerContainer, PostgreSQLContainer}
 import com.snowplowanalytics.iglu.ctl.commands.TableCheckITSpec._
 import com.snowplowanalytics.iglu.ctl.{Command, Server}
@@ -26,7 +26,7 @@ import org.mockserver.model.HttpResponse.response
 import org.specs2.mutable.Specification
 import org.testcontainers.lifecycle.Startable
 
-import scala.concurrent.ExecutionContext
+import cats.effect.unsafe.implicits.global
 
 class TableCheckITSpec extends Specification {
 

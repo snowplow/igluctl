@@ -24,7 +24,7 @@ import com.snowplowanalytics.iglu.core.typeclasses.StringifySchema
 import com.snowplowanalytics.iglu.ctl.Common.Error
 import com.snowplowanalytics.iglu.ctl.{Command, Common, Failing, File, Server, Result => IgluctlResult}
 import org.http4s.circe.jsonOf
-import org.http4s.{Request, Response}
+import org.http4s.{EntityDecoder, Request, Response}
 import org.http4s.client.Client
 
 
@@ -35,7 +35,7 @@ object Pull {
       override def asString(container: SelfDescribingSchema[Json]): String =
         container.normalize(igluNormalizeSchemaJson).spaces2
     }
-  implicit val listDecoder = jsonOf[IO, List[Json]]
+  implicit val listDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
 
   /**
     * Primary method of static pull command. Fetches all the schemas from given

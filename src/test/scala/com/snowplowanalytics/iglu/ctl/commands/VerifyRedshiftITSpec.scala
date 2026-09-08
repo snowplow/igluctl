@@ -10,6 +10,7 @@ import org.http4s.Uri
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder
 import org.specs2.mutable.Specification
+import cats.effect.unsafe.implicits.global
 
 
 class VerifyRedshiftITSpec extends Specification {
